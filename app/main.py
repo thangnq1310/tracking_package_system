@@ -9,7 +9,7 @@ dotenv.load_dotenv()
 
 class CustomerWorker():
     def __init__(self):
-        self.topic = os.getenv('CUSTOMER_TOPIC', 'dbserver1.classicmodels.customers')
+        self.topic = os.getenv('CUSTOMER_TOPIC', 'dbserver1.sakila.customers')
         self.group = os.getenv('CUSTOMER_GROUP', 'customer_group')
         self.brokers = os.getenv('BOOTSTRAP_SERVERS', 'kafka1:9092,kafka2:9093,kafka3:9094')
         self.webhook_url = os.getenv('WEBHOOK_URL', 'https://webhook.site/16ee7df2-0643-4759-aa89-447bc283f06f')

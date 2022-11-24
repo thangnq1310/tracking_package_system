@@ -59,10 +59,12 @@ services:
      - 3307:3306
     restart: unless-stopped
     environment:
+     - MYSQL_DATABASE=${DB}
      - MYSQL_ROOT_PASSWORD=${PW}
     container_name: mysql_kafka
     volumes:
-      - ./db/mysqlsampledatabase.sql:/docker-entrypoint-initdb.d/sample.sql
+      - ./db/sakila-data.sql:/docker-entrypoint-initdb.d/sakila-data.sql
+      - ./db/sakila-schema.sql:/docker-entrypoint-initdb.d/sakila-schema.sql
 
   connect:
     image: debezium/connect:2.0
@@ -102,6 +104,3 @@ services:
     ports:
       - 5000:5000
     container_name: app
-    depends_on:
-      connect:
-        condition: service_healthy

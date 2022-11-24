@@ -3,7 +3,7 @@ curl --location --request POST 'debezium:8083/connectors/' \
 --header 'Accept: application/json' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-    "name": "classicmodel-connector",
+    "name": "sakila-connector",
     "config": {
         "connector.class": "io.debezium.connector.mysql.MySqlConnector",
         "tasks.max": "1",
@@ -14,8 +14,8 @@ curl --location --request POST 'debezium:8083/connectors/' \
         "database.allowPublicKeyRetrieval":"true",
         "database.server.id": "184054",
         "topic.prefix": "dbserver1",
-        "database.include.list": "classicmodels",
+        "database.include.list": "sakila",
         "schema.history.internal.kafka.bootstrap.servers": "kafka1:9092,kafka2:9093,kafka3:9094",
-        "schema.history.internal.kafka.topic": "schemahistory.classicmodels"
+        "schema.history.internal.kafka.topic": "schemahistory.sakila"
     }
 }'
