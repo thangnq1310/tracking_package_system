@@ -1,12 +1,12 @@
-kafka-topics --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --alter --topic dbserver1.classicmodels.customers --partitions 3
+kafka-topics --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --alter --topic connector.logistic.packages --partitions 3
 
-kafka-topics --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --describe --topic dbserver1.classicmodels.customers
+kafka-topics --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --describe --topic connector.logistic.packages
 
-kafka-consumer-groups --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --describe --group inventory_group
+kafka-consumer-groups --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --describe --group package_group
 
 kafka-consumer-groups --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --list
 
-kafka-console-consumer --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --topic dbserver1.classicmodels.customers --group classicmodels
+kafka-console-consumer --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --topic connector.logistic.packages --group package_group
 
 kafka-topics --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --list
 

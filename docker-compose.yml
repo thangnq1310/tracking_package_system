@@ -5,7 +5,7 @@ services:
     hostname: zookeeper
     container_name: zookeeper
     ports:
-      - 2181:2181
+      - "2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_SERVER_ID: 1
@@ -16,7 +16,7 @@ services:
     hostname: kafka1
     container_name: kafka1
     ports:
-      - 9092:9092
+      - "9092:9092"
     environment:
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
       KAFKA_BROKER_ID: 1
@@ -30,7 +30,7 @@ services:
     hostname: kafka2
     container_name: kafka2
     ports:
-      - 9093:9093
+      - "9093:9093"
     environment:
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
       KAFKA_BROKER_ID: 2
@@ -44,7 +44,7 @@ services:
     hostname: kafka3
     container_name: kafka3
     ports:
-      - 9094:9094
+      - "9094:9094"
     environment:
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
       KAFKA_BROKER_ID: 3
@@ -56,18 +56,20 @@ services:
   mysql:
     image: mysql:8.0
     ports:
-     - 3307:3306
+     - "3307:3306"
     restart: unless-stopped
     environment:
      - MYSQL_ROOT_PASSWORD=${PW}
+     - LANG=C.UTF-8
     container_name: mysql_kafka
     volumes:
-      - ./db/mysqlsampledatabase.sql:/docker-entrypoint-initdb.d/sample.sql
+      - ./db/data:/var/lib/mysql
+      - ./db/logistic.sql:/docker-entrypoint-initdb.d/logistic.sql
 
   connect:
     image: debezium/connect:2.0
     ports:
-     - 8083:8083
+     - "8083:8083"
     environment:
      - BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}
      - GROUP_ID=1
@@ -81,16 +83,11 @@ services:
       - kafka3
       - mysql
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "http://localhost:8083"]
-      interval: 10s
-      timeout: 5s
-      retries: 2
 
   manager:
     image: sheepkiller/kafka-manager
     ports:
-      - 9000:9000
+      - "9000:9000"
     environment:
       - ZK_HOSTS=zookeeper:2181
     container_name: manager
@@ -100,8 +97,8 @@ services:
   app:
     build: ./app
     ports:
-      - 5000:5000
+      - "5000:5000"
+    volumes:
+      - ./app/:/app
+    restart: always
     container_name: app
-    depends_on:
-      connect:
-        condition: service_healthy

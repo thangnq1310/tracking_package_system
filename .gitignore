@@ -1,2 +1,4 @@
-venv
-model/__pycache__
+app/venv
+app/models/__pycache__
+db
+.idea

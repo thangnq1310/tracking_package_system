@@ -1,7 +1,8 @@
-confluent_kafka==1.8.2
-python-dotenv~=0.14.0
-peewee~=3.13.3
+confluent_kafka
+sqlalchemy
 PyMySQL
-ujson==3.1.0
+python-dotenv
+ujson
 kafka-python
 requests
+flask
