@@ -5,7 +5,7 @@ from kafka import KafkaConsumer
 from dotenv import load_dotenv
 
 from infrastructures.http_connector import HTTPConnectorService
-from services.partner_service import *
+from services.email_service import *
 from models.base import session
 from models.model import *
 import constants
@@ -40,8 +40,6 @@ class ConsumerKafka:
             raw_msg = json.loads(msg.value)
             if 'payload' in raw_msg:
                 raw_msg = raw_msg['payload']
-
-            print('PKG_ORDER:', raw_msg['after']['pkg_order'], ', STATUS:', raw_msg['after']['status'])
 
             self.process_message(raw_msg)
 
