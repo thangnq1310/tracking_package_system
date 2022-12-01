@@ -1,4 +1,4 @@
-import ujson as json
+import json
 import os
 
 from kafka import KafkaProducer
@@ -12,4 +12,5 @@ class EmailProducer:
         self.producer = KafkaProducer(bootstrap_servers=self.brokers)
 
     def send_message(self, data):
-        self.producer.send(self.topic, str(json.encode(data)).encode('utf-8'))
+        self.producer.send(self.topic, json.dumps(data).encode('utf-8'))
+        self.producer.flush()
