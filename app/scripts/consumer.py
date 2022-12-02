@@ -44,6 +44,7 @@ class ConsumerKafka:
             if 'payload' in self.raw_msg:
                 self.raw_msg = self.raw_msg['payload']
 
+            # print('PKG_ORDER:', self.raw_msg['after']['pkg_order'], ', PKG_STATUS:', self.raw_msg['after']['status'])
             self.process_message(self.raw_msg)
 
     def process_message(self, raw_msg):
@@ -52,7 +53,7 @@ class ConsumerKafka:
             pkg_id = after['id']
             shop_id = after['shop_id']
             base_url = os.getenv('WEBHOOK_URL')
-            # apple - package status is shipped
+            # alpha - package status is shipped
             if after['status'] == constants.PKG_STATUS['SHIPPED'] and shop_id == 1:
                 customer = session.query(Customers.name, Customers.email). \
                     join(Packages).filter(Packages.id == pkg_id).first()
@@ -64,9 +65,10 @@ class ConsumerKafka:
                         'customer': dict(customer),
                         'shop': dict(shop)
                     }
-                    res = requests.post(url=f'{base_url}/apple', json=json.dumps(params))
+                    res = requests.post(url=f'{base_url}/alpha', json=json.dumps(params))
+                    print("RESPONSE: ", res)
 
-            # shopee - when package is in station 2
+            # beta - when package is in station 2
             if after['current_station_id'] == 2 and shop_id == 2:
                 station_name = session.query(Stations.name). \
                     join(Stations.packages).filter(Packages.id == pkg_id).first()
@@ -76,9 +78,10 @@ class ConsumerKafka:
                         'station_name': str(station_name),
                         'pkg_order': after['pkg_order']
                     }
-                    res = requests.post(url=f'{base_url}/shopee', json=json.dumps(params))
+                    res = requests.post(url=f'{base_url}/beta', json=json.dumps(params))
+                    print("RESPONSE: ", res)
 
-            # tiktok - customer in Ha Noi order
+            # gamma - customer in Ha Noi order
             customer_id = after['customer_id']
             customer = session.query(Customers.name, Customers.email) \
                 .join(Packages) \
@@ -93,7 +96,8 @@ class ConsumerKafka:
                     'customer': dict(customer)
                 }
 
-                res = requests.post(url=f'{base_url}/tiktok', json=json.dumps(params))
+                res = requests.post(url=f'{base_url}/gamma', json=json.dumps(params))
+                print("RESPONSE: ", res)
 
         except Exception as e:
             print('[EXCEPTION] Has an error when post to webhook: ' + str(e))
