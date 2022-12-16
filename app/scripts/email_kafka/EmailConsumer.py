@@ -17,8 +17,7 @@ class EmailConsumer(ConsumerKafka):
 
     def process_message(self, raw_msg):
         # call email service
-        self.raw_msg = json.loads(raw_msg)
-        sender = self.raw_msg['shop']['email']
-        recipient = self.raw_msg['customer']['email']
-        email_service = EmailService(sender, recipient, self.raw_msg)
+        sender = raw_msg['shop']['email']
+        recipient = raw_msg['customer']['email']
+        email_service = EmailService(sender, recipient, raw_msg)
         email_service.send_email()

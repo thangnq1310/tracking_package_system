@@ -6,6 +6,10 @@ from dotenv import load_dotenv
 import ujson as json
 import sys
 
+from scripts.email_kafka.EmailProducer import EmailProducer
+
+from models.model import Customers, Packages, Shops, Stations
+
 sys.path.append('../')
 from models.base import session
 from models.model import *
@@ -44,7 +48,7 @@ class ConsumerKafka:
             if 'payload' in self.raw_msg:
                 self.raw_msg = self.raw_msg['payload']
 
-            # print('PKG_ORDER:', self.raw_msg['after']['pkg_order'], ', PKG_STATUS:', self.raw_msg['after']['status'])
+            print('PKG_ORDER:', self.raw_msg['after']['pkg_order'], ', PKG_STATUS:', self.raw_msg['after']['status'])
             self.process_message(self.raw_msg)
 
     def process_message(self, raw_msg):
@@ -65,8 +69,10 @@ class ConsumerKafka:
                         'customer': dict(customer),
                         'shop': dict(shop)
                     }
+                    email_producer = EmailProducer()
+                    email_producer.send_message(params)
                     res = requests.post(url=f'{base_url}/alpha', json=json.dumps(params))
-                    print("RESPONSE: ", res)
+                    print("RESPONSE: ", res.text, ", TOTAL TIME:", res.elapsed.total_seconds())
 
             # beta - when package is in station 2
             if after['current_station_id'] == 2 and shop_id == 2:
@@ -79,7 +85,7 @@ class ConsumerKafka:
                         'pkg_order': after['pkg_order']
                     }
                     res = requests.post(url=f'{base_url}/beta', json=json.dumps(params))
-                    print("RESPONSE: ", res)
+                    print("RESPONSE: ", res.text, ", TOTAL TIME:", res.elapsed.total_seconds())
 
             # gamma - customer in Ha Noi order
             customer_id = after['customer_id']
@@ -97,7 +103,7 @@ class ConsumerKafka:
                 }
 
                 res = requests.post(url=f'{base_url}/gamma', json=json.dumps(params))
-                print("RESPONSE: ", res)
+                print("RESPONSE: ", res.text, "TOTAL TIME:", res.elapsed.total_seconds())
 
         except Exception as e:
             print('[EXCEPTION] Has an error when post to webhook: ' + str(e))

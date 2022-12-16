@@ -14,7 +14,7 @@ def ping():
 def alpha_webhook():
     req_data = request.json if request.json else {}
     print("Params Alpha:", req_data)
-    time.sleep(10)
+    time.sleep(2)
 
     return {
         'success': True,
@@ -38,7 +38,7 @@ def beta_webhook():
 def gamma_webhook():
     req_data = request.json if request.json else {}
     print("Params Gamma:", req_data)
-    time.sleep(8)
+    time.sleep(10)
 
     return {
         'success': True,

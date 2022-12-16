@@ -1,4 +1,6 @@
 app/venv
 app/models/__pycache__
-db
 .idea
+db/data
+app/controllers/__pycache__
+app/scripts/__pycache__
