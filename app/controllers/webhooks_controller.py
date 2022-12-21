@@ -24,8 +24,8 @@ def alpha_webhook():
 
 @webhooks_routes.route('/beta', methods=['POST'])
 def beta_webhook():
-    req_data = request.json if request.json else {}
-    print("Params Beta:", req_data)
+    # req_data = request.json if request.json else {}
+    # print("Params Beta:", req_data)
     time.sleep(15)
 
     return {

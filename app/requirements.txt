@@ -6,3 +6,4 @@ ujson
 kafka-python
 requests
 flask
+aiohttp

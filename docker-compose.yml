@@ -106,3 +106,13 @@ services:
       - ./app/:/app
     restart: always
     container_name: app
+
+  server:
+    build: ./server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./server:/server
+      - /server/node_modules
+    restart: always
+    container_name: server

@@ -12,4 +12,4 @@ API_HANDLE_HOST = os.getenv('API_HANDLE_HOST', '0.0.0.0')
 API_HANDLE_PORT = os.getenv('API_HANDLE_PORT', 5000)
 
 if __name__ == '__main__':
-    app.run(host=API_HANDLE_HOST, port=API_HANDLE_PORT, debug=True)
+    app.run(host=API_HANDLE_HOST, port=API_HANDLE_PORT, debug=True, threaded=False, processes=3)

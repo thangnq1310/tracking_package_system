@@ -2,11 +2,11 @@ kafka-topics --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --alter --to
 
 kafka-topics --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --describe --topic connector.logistic.packages
 
-kafka-consumer-groups --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --describe --group package_group
+kafka-consumer-groups --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --describe --group package_group_async
 
 kafka-consumer-groups --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --list
 
-kafka-console-consumer --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --topic connector.logistic.packages --group package_group
+kafka-console-consumer --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --topic connector.logistic.packages --group package_group_async
 
 kafka-topics --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --list
 
