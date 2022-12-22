@@ -7,3 +7,4 @@ app/controllers/__pycache__
 app/scripts/__pycache__
 server/node_modules
 server/package-lock.json
+app/cache

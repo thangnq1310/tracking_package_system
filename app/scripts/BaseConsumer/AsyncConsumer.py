@@ -6,13 +6,13 @@ import time
 from kafka import KafkaConsumer
 from dotenv import load_dotenv
 import ujson as json
-import sys
+from abc import ABC
 
 load_dotenv()
 
 
 # python worker.py Consumer AsyncConsumer
-class AsyncConsumer:
+class AsyncConsumer(ABC):
     __slots__ = ['list_msg', 'topic', 'brokers', 'group', 'limit_msg', 'package_data']
 
     def __init__(self):

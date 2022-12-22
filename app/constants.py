@@ -5,3 +5,9 @@ PKG_STATUS = {
     'SHIPPED': 3,
     'CANCELED': 4
 }
+
+RANK_TOPIC = {
+    'platinum': 'rank_platinum',
+    'gold': 'rank_gold',
+    'silver': 'rank_silver'
+}

@@ -116,3 +116,14 @@ services:
       - /server/node_modules
     restart: always
     container_name: server
+
+  redis:
+    image: redis:6.2-alpine
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./app/cache:/data
+    restart: always
+    container_name: redis

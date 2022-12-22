@@ -1,9 +1,9 @@
 import os
 
-from scripts.consumer import AsyncConsumerKafka
+from scripts.BaseConsumer.AsyncConsumer import AsyncConsumer
 
 
-class GoldConsumer(AsyncConsumerKafka):
+class GoldConsumer(AsyncConsumer):
     def __init__(self):
         super().__init__()
         self.topic = os.getenv('GOLD_TOPIC', 'gold_topic')
