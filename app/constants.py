@@ -7,7 +7,7 @@ PKG_STATUS = {
 }
 
 RANK_TOPIC = {
-    'platinum': 'rank_platinum',
-    'gold': 'rank_gold',
-    'silver': 'rank_silver'
+    'platinum': 'platinum_topic',
+    'gold': 'gold_topic',
+    'silver': 'silver_topic'
 }

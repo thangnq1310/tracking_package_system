@@ -6,13 +6,12 @@ import time
 from kafka import KafkaConsumer
 from dotenv import load_dotenv
 import ujson as json
-from abc import ABC
 
 load_dotenv()
 
 
 # python worker.py Consumer AsyncConsumer
-class AsyncConsumer(ABC):
+class AsyncConsumer:
     __slots__ = ['list_msg', 'topic', 'brokers', 'group', 'limit_msg', 'package_data']
 
     def __init__(self):
@@ -60,7 +59,10 @@ class AsyncConsumer(ABC):
 
     def process_msg(self, msg):
         try:
-            self.package_data = json.loads(msg.decode('utf-8'))
+            self.package_data = json.loads(msg.value.decode('utf-8'))
+
+            print("Package with code:", self.package_data['pkg_code'],
+                  "and status:", self.package_data['package_status_id'])
         except Exception as e:
             print("Cannot parse message -> Invalid format" + str(e))
 

@@ -3,6 +3,7 @@ import os
 from scripts.BaseConsumer.AsyncConsumer import AsyncConsumer
 
 
+# python worker.py Consumer GoldConsumer
 class GoldConsumer(AsyncConsumer):
     def __init__(self):
         super().__init__()

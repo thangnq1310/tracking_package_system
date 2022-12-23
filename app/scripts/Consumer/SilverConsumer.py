@@ -1,10 +1,11 @@
 import os
 
-from scripts.Consumer import AsyncConsumer
+from scripts.BaseConsumer.AsyncConsumer import AsyncConsumer
 
 
-class GoldConsumer(AsyncConsumer.AsyncConsumer):
+# python worker.py Consumer SilverConsumer
+class SilverConsumer(AsyncConsumer):
     def __init__(self):
         super().__init__()
-        self.topic = os.getenv('GOLD_TOPIC', 'gold_topic')
-        self.group = os.getenv('GOLD_GROUP', 'gold_group')
+        self.topic = os.getenv('SILVER_TOPIC', 'silver_topic')
+        self.group = os.getenv('SILVER_GROUP', 'silver_group')

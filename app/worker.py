@@ -13,7 +13,6 @@ module_name = argv[1]
 class_name = argv[2]
 full_path = 'scripts.' + module_name + '.' + class_name
 
-print(full_path, "ALL ??")
 # Import module
 module = importlib.import_module(full_path)
 service = getattr(module, class_name)

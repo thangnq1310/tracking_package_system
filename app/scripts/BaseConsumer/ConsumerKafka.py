@@ -6,6 +6,7 @@ import ujson as json
 import os
 import dotenv
 import redis
+import constants
 
 from models.base import session
 from models.model import Shops
@@ -13,7 +14,7 @@ from models.model import Shops
 dotenv.load_dotenv()
 
 
-# python worker.py Consumer ConsumerKafka
+# python worker.py BaseConsumer ConsumerKafka
 class ConsumerKafka:
     __slots__ = ['ts_ms', 'topic', 'brokers', 'group', 'raw_package_data', 'package_data', 'cache', 'producer']
 
@@ -58,13 +59,9 @@ class ConsumerKafka:
         )
 
         for message in client:
-            start_time = time.time()
             self.decode_message(message)
-            time_metrics = time.time() - start_time
-            print("TIME PROCESS MSG WEBHOOK: ", time_metrics)
 
     def decode_message(self, msg):
-        start_time = time.time()
         try:
             self.raw_package_data = json.loads(msg.value.decode('utf-8'))
             if 'payload' in self.raw_package_data:
@@ -79,9 +76,6 @@ class ConsumerKafka:
             self.process_message(self.package_data)
         except Exception as e:
             print("Cannot parse message -> Invalid format" + str(e))
-
-        time_metrics = time.time() - start_time
-        print("TIME PROCESS MSG WEBHOOK: ", time_metrics)
 
     def format_message(self):
         package_data = self.raw_package_data['after']
@@ -109,13 +103,7 @@ class ConsumerKafka:
 
     def process_message(self, package_data):
         try:
-            # redis
-            RANK_TOPIC = {
-                'platinum': 'rank_platinum',
-                'gold': 'rank_gold',
-                'silver': 'rank_silver'
-            }
-
+            # cache shop
             shop_response_time = self.cache.get(package_data['shop_id'])
             shop_response_time = json.loads(shop_response_time) if shop_response_time else None
 
@@ -137,11 +125,11 @@ class ConsumerKafka:
             package_data['webhook_url'] = shop_response_time['webhook_url']
 
             if 5 > cache_time >= 2:
-                self.producer_topic(RANK_TOPIC['platinum'], package_data)
+                self.producer_topic(constants.RANK_TOPIC['platinum'], package_data)
             elif 5 <= cache_time < 10:
-                self.producer_topic(RANK_TOPIC['gold'], package_data)
+                self.producer_topic(constants.RANK_TOPIC['gold'], package_data)
             else:
-                self.producer_topic(RANK_TOPIC['silver'], package_data)
+                self.producer_topic(constants.RANK_TOPIC['silver'], package_data)
 
         except Exception as e:
             print('[EXCEPTION] Has an error when post to webhook: ' + str(e))
