@@ -6,8 +6,10 @@ PKG_STATUS = {
     'CANCELED': 4
 }
 
-RANK_TOPIC = {
-    'platinum': 'platinum_topic',
-    'gold': 'gold_topic',
-    'silver': 'silver_topic'
-}
+# RANK_TOPIC = {
+#     'platinum': 'platinum_topic',
+#     'gold': 'gold_topic',
+#     'silver': 'silver_topic'
+# }
+
+RANK_TOPIC = ['connector.logistic.packages', 'gold_topic', 'silver_topic']
