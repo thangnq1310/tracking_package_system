@@ -1,4 +1,6 @@
-from flask import Blueprint, request, jsonify
+import time
+
+from flask import Blueprint, request
 
 webhooks_routes = Blueprint('webhooks_routes', __name__)
 
@@ -8,25 +10,37 @@ def ping():
     return 'pong'
 
 
-@webhooks_routes.route('/apple', methods=['POST'])
-def apple_webhook():
+@webhooks_routes.route('/alpha', methods=['POST'])
+def alpha_webhook():
     req_data = request.json if request.json else {}
-    print(req_data, "APPLE")
+    print("Params Alpha:", req_data)
+    time.sleep(2)
 
-    return 'Apple'
+    return {
+        'success': True,
+        'message': 'Alpha receive message successfully!'
+    }
 
 
-@webhooks_routes.route('/shopee', methods=['POST'])
-def shopee_webhook():
+@webhooks_routes.route('/beta', methods=['POST'])
+def beta_webhook():
+    # req_data = request.json if request.json else {}
+    # print("Params Beta:", req_data)
+    time.sleep(15)
+
+    return {
+        'success': True,
+        'message': 'Beta receive message successfully!',
+    }
+
+
+@webhooks_routes.route('/gamma', methods=['POST'])
+def gamma_webhook():
     req_data = request.json if request.json else {}
-    print(req_data, "SHOPEE")
+    print("Params Gamma:", req_data)
+    time.sleep(10)
 
-    return 'Shopee'
-
-
-@webhooks_routes.route('/tiktok', methods=['POST'])
-def tiktok_webhook():
-    req_data = request.json if request.json else {}
-    print(req_data, "TIKTOK")
-
-    return 'Tiktok'
+    return {
+        'success': True,
+        'message': 'Gamma receive message successfully!',
+    }

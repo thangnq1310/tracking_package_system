@@ -12,8 +12,7 @@ user = os.getenv('USER_NAME', 'root')
 password = os.getenv('PW', 'It235711')
 
 engine = create_engine(
-    f'mysql+pymysql://{user}:{password}@{db_host}:{db_port}/{database}',
-    echo=True
+    f'mysql+pymysql://{user}:{password}@{db_host}:{db_port}/{database}'
 )
 Session = sessionmaker(bind=engine)
 session = Session()

@@ -2,7 +2,7 @@ import os
 
 import dotenv
 import requests
-import ujson as json
+import json
 
 dotenv.load_dotenv()
 

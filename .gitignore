@@ -1,4 +1,13 @@
 app/venv
 app/models/__pycache__
-db
+app/.idea
 .idea
+db/data
+app/controllers/__pycache__
+app/scripts/__pycache__
+server/node_modules
+server/package-lock.json
+app/cache
+app/scripts/BaseConsumer/__pycache__
+app/scripts/Consumer/__pycache__
+app/__pycache__
