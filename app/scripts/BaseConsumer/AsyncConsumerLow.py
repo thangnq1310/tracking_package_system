@@ -30,8 +30,8 @@ class AsyncConsumerLow:
         self.producer = None
 
     def run(self):
-        asyncio.run(self.listen_message())
         self.init_producer()
+        asyncio.run(self.listen_message())
 
     def init_producer(self):
         producer_conf = {'bootstrap.servers': self.brokers}
@@ -107,7 +107,7 @@ class AsyncConsumerLow:
     def switch_topic(self, message):
         rank_topic = constants.RANK_TOPIC
         for index, topic in enumerate(rank_topic):
-            if topic == self.topic and index != len(rank_topic - 1):
+            if topic == self.topic and index != len(rank_topic) - 1:
                 self.producer_topic(rank_topic[index + 1], message)
 
     def producer_topic(self, topic, package_data):
@@ -115,5 +115,6 @@ class AsyncConsumerLow:
             pkg_code = package_data['pkg_code']
             self.producer.produce(topic, json.dumps(package_data).encode('utf-8'), key=pkg_code)
             self.producer.poll(0)
+            self.producer.flush()
         except Exception as e:
             print('[EXCEPTION] Has an error when producer to topic: ' + str(e))

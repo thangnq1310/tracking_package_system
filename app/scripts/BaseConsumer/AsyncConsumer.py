@@ -28,7 +28,7 @@ class AsyncConsumer:
         self.list_msg = []
         self.limit_msg = 50
         self.timeout_msg = 5000
-        self.timeout_request = 2
+        self.timeout_request = 3
         self.package_data = None
         self.raw_package_data = None
         self.ts_ms = None
@@ -36,9 +36,9 @@ class AsyncConsumer:
         self.producer = None
 
     def run(self):
-        asyncio.run(self.listen_message())
         self.init_producer()
         self.init_redis()
+        asyncio.run(self.listen_message())
 
     def init_redis(self):
         self.cache = redis.Redis(
@@ -77,7 +77,7 @@ class AsyncConsumer:
                         for message in raw_message:
                             current_topic = self.decode_message(message)
                             if not current_topic:
-                                return
+                                continue
                             self.list_msg.append(self.package_data)
 
                 if len(self.list_msg) >= self.limit_msg \
@@ -161,6 +161,8 @@ class AsyncConsumer:
             shop_response_time = self.cache.get(package_data['shop_id'])
             shop_response_time = json.loads(shop_response_time) if shop_response_time else None
 
+            package_data['webhook_url'] = shop_response_time['webhook_url'] if shop_response_time else None
+
             if shop_response_time is None:
                 shop = db.query(Shops.webhook_url, Shops.name)\
                                     .filter(Shops.id == package_data['shop_id']).first()
@@ -173,22 +175,27 @@ class AsyncConsumer:
                 else:
                     shop['cache_time'] = 5
 
+                package_data['webhook_url'] = shop['webhook_url']
                 self.cache.set(package_data['shop_id'], json.dumps(shop))
 
+                return True
+
             cache_time = shop_response_time['cache_time']
-            package_data['webhook_url'] = shop_response_time['webhook_url']
 
             if 5 > cache_time >= 2:
+                print('Message in current topic')
                 return True
             elif 5 <= cache_time < 10:
-                self.producer_topic(constants.RANK_TOPIC['gold'], package_data)
+                print('Switch message to', constants.RANK_TOPIC[1])
+                self.producer_topic(constants.RANK_TOPIC[1], package_data)
             else:
-                self.producer_topic(constants.RANK_TOPIC['silver'], package_data)
+                print('Switch message to', constants.RANK_TOPIC[2])
+                self.producer_topic(constants.RANK_TOPIC[2], package_data)
 
             return False
 
         except Exception as e:
-            print('[EXCEPTION] Has an error when post to webhook: ' + str(e))
+            print('[EXCEPTION] Has an error when caching: ' + str(e))
 
     def switch_topic(self, message):
         rank_topic = constants.RANK_TOPIC
@@ -201,5 +208,6 @@ class AsyncConsumer:
             pkg_code = package_data['pkg_code']
             self.producer.produce(topic, json.dumps(package_data).encode('utf-8'), key=pkg_code)
             self.producer.poll(0)
+            self.producer.flush()
         except Exception as e:
             print('[EXCEPTION] Has an error when producer to topic: ' + str(e))
