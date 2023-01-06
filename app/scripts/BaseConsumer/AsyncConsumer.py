@@ -2,6 +2,7 @@ import asyncio
 import aiohttp
 import os
 import time
+import logging
 
 import redis
 from confluent_kafka import Producer
@@ -89,9 +90,9 @@ class AsyncConsumer:
 
                         self.list_msg = []
                         time_metrics = time.time() - start_time
-                        print("TIME PROCESS MSG WEBHOOK: ", time_metrics)
-            except Exception as e:
-                print('Timeout message ' + str(e))
+                        print(f"TOTAL TIME FOR PROCESSING MESSAGES TO WEBHOOK: ", time_metrics)
+            except (TimeoutError, Exception):
+                logging.error(f"Timeout because not getting any message after {self.timeout_msg}", exc_info=True)
 
     async def get_task(self, session, msg):
         base_url = os.getenv('WEBHOOK_URL')
@@ -106,9 +107,9 @@ class AsyncConsumer:
                 response_webhook = await response.json()
 
                 print(response_webhook)
-        except Exception as e:
+        except (TimeoutError, Exception):
             self.switch_topic(self.package_data)
-            print("Exception timeout " + str(e))
+            print("Timeout for waiting for response, this request will be switched to alternative topic")
 
     def decode_message(self, msg):
         try:
@@ -128,8 +129,8 @@ class AsyncConsumer:
                   "and status:", self.package_data['package_status_id'])
 
             return current_topic
-        except Exception as e:
-            print("Cannot parse message -> Invalid format" + str(e))
+        except (ValueError, Exception):
+            logging.error("Cannot parse message because invalid format", exc_info=True)
 
     def format_message(self):
         package_data = self.raw_package_data['after']
@@ -164,8 +165,8 @@ class AsyncConsumer:
             package_data['webhook_url'] = shop_response_time['webhook_url'] if shop_response_time else None
 
             if shop_response_time is None:
-                shop = db.query(Shops.webhook_url, Shops.name)\
-                                    .filter(Shops.id == package_data['shop_id']).first()
+                shop = db.query(Shops.webhook_url, Shops.name) \
+                    .filter(Shops.id == package_data['shop_id']).first()
                 shop = dict(shop)
                 shop_name = shop['name']
                 if shop_name == 'Alpha':
@@ -183,19 +184,19 @@ class AsyncConsumer:
             cache_time = shop_response_time['cache_time']
 
             if 5 > cache_time >= 2:
-                print('Message in current topic')
+                print(f'This message has been cached and will stay in {self.topic} topic')
                 return True
             elif 5 <= cache_time < 10:
-                print('Switch message to', constants.RANK_TOPIC[1])
+                print('This message has been cached, switch message to', constants.RANK_TOPIC[1])
                 self.producer_topic(constants.RANK_TOPIC[1], package_data)
             else:
-                print('Switch message to', constants.RANK_TOPIC[2])
+                print('This message has been cached, switch message to', constants.RANK_TOPIC[2])
                 self.producer_topic(constants.RANK_TOPIC[2], package_data)
 
             return False
 
-        except Exception as e:
-            print('[EXCEPTION] Has an error when caching: ' + str(e))
+        except (ValueError, Exception):
+            logging.error('Has an error when caching', exc_info=True)
 
     def switch_topic(self, message):
         rank_topic = constants.RANK_TOPIC
@@ -210,4 +211,4 @@ class AsyncConsumer:
             self.producer.poll(0)
             self.producer.flush()
         except Exception as e:
-            print('[EXCEPTION] Has an error when producer to topic: ' + str(e))
+            logging.error('Has an error when producer to topic: ' + str(e))

@@ -11,3 +11,4 @@ app/cache
 app/scripts/BaseConsumer/__pycache__
 app/scripts/Consumer/__pycache__
 app/__pycache__
+__pycache__/

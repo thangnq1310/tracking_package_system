@@ -1,4 +1,6 @@
 import asyncio
+import logging
+
 import aiohttp
 import os
 import time
@@ -25,7 +27,7 @@ class AsyncConsumerLow:
         self.list_msg = []
         self.limit_msg = 50
         self.timeout_msg = 5000
-        self.timeout_request = 2
+        self.timeout_request = 5
         self.package_data = None
         self.producer = None
 
@@ -74,9 +76,9 @@ class AsyncConsumerLow:
 
                         self.list_msg = []
                         time_metrics = time.time() - start_time
-                        print("TIME PROCESS MSG WEBHOOK: ", time_metrics)
-            except Exception as e:
-                print('Timeout message ' + str(e))
+                        print(f"TOTAL TIME FOR PROCESSING MESSAGES TO WEBHOOK: ", time_metrics)
+            except (TimeoutError, Exception):
+                logging.error(f"Timeout because not getting any message after {self.timeout_msg}", exc_info=True)
 
     def process_msg(self, msg):
         try:
@@ -84,8 +86,8 @@ class AsyncConsumerLow:
 
             print("Package with code:", self.package_data['pkg_code'],
                   "and status:", self.package_data['package_status_id'])
-        except Exception as e:
-            print("Cannot parse message -> Invalid format" + str(e))
+        except (ValueError, Exception):
+            logging.error("Cannot parse message because invalid format", exc_info=True)
 
     async def get_task(self, session, msg):
         base_url = os.getenv('WEBHOOK_URL')
@@ -100,9 +102,9 @@ class AsyncConsumerLow:
                 response_webhook = await response.json()
 
                 print(response_webhook)
-        except Exception as e:
+        except (TimeoutError, Exception):
             self.switch_topic(self.package_data)
-            print("Exception timeout " + str(e))
+            print("Timeout for waiting for response, this request will be switched to alternative topic")
 
     def switch_topic(self, message):
         rank_topic = constants.RANK_TOPIC
@@ -117,4 +119,4 @@ class AsyncConsumerLow:
             self.producer.poll(0)
             self.producer.flush()
         except Exception as e:
-            print('[EXCEPTION] Has an error when producer to topic: ' + str(e))
+            logging.error('Has an error when producer to topic: ' + str(e))
