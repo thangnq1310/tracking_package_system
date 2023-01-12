@@ -1,10 +1,12 @@
 import asyncio
 import logging
+from functools import reduce
 
 import aiohttp
 import os
 import time
 
+import redis
 from confluent_kafka import Producer
 from kafka import KafkaConsumer
 from dotenv import load_dotenv
@@ -18,7 +20,7 @@ load_dotenv()
 # python worker.py BaseConsumer AsyncConsumerLow
 class AsyncConsumerLow:
     __slots__ = ['list_msg', 'topic', 'brokers', 'group', 'limit_msg',
-                 'package_data', 'timeout_msg', 'timeout_request', 'producer']
+                 'package_data', 'timeout_msg', 'timeout_request', 'producer', 'cache']
 
     def __init__(self):
         self.brokers = os.getenv('BOOTSTRAP_SERVERS', 'kafka1:9092,kafka2:9093,kafka3:9094')
@@ -30,10 +32,18 @@ class AsyncConsumerLow:
         self.timeout_request = 5
         self.package_data = None
         self.producer = None
+        self.cache = None
 
     def run(self):
         self.init_producer()
+        self.init_redis()
         asyncio.run(self.listen_message())
+
+    def init_redis(self):
+        self.cache = redis.Redis(
+            host='redis',
+            port=6379
+        )
 
     def init_producer(self):
         producer_conf = {'bootstrap.servers': self.brokers}
@@ -92,6 +102,7 @@ class AsyncConsumerLow:
     async def get_task(self, session, msg):
         base_url = os.getenv('WEBHOOK_URL')
         url = base_url + msg['webhook_url']
+        shop_id = msg['shop_id']
         params = {
             'pkg_code': msg['pkg_code'],
             'package_status_id': msg['package_status_id'],
@@ -100,8 +111,17 @@ class AsyncConsumerLow:
         try:
             async with session.post(url, json=params, ssl=False, timeout=self.timeout_request) as response:
                 response_webhook = await response.json()
+                response_time = round(response_webhook.elapsed.total_seconds(), 2)
 
-                print(response_webhook)
+                shop_cached = json.loads(self.cache.get(shop_id))
+                time_responses = shop_cached['time_responses']
+
+                if shop_cached:
+                    time_responses.append(response_time)
+                    recalculated = reduce(lambda x, y: x + y, time_responses) / len(time_responses)
+                    shop_cached['time_responses'] = time_responses
+                    shop_cached['avg_response'] = recalculated
+                    self.cache.set(shop_id, json.dumps(shop_cached))
         except (TimeoutError, Exception):
             self.switch_topic(self.package_data)
             print("Timeout for waiting for response, this request will be switched to alternative topic")

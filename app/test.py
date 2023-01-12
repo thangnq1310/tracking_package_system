@@ -1,28 +1,21 @@
-import aiohttp
-import asyncio
-import time
+import ujson as json
 
-start_time = time.time()
+import redis
 
+s = {
+    'shop_id': 1,
+    'webhook_url': '/api/list',
+    'response_time': [1, 2.5, 3.1],
+    "avg_time": 9.1
+}
 
-async def get_pokemon(session, url):
-    async with session.get(url) as resp:
-        pokemon = await resp.json()
-        return pokemon['name']
+cache = redis.Redis(
+            host='localhost',
+            port=6379
+)
 
+cache.set(s['shop_id'], json.dumps(s))
 
-async def main():
+res = json.loads(cache.get("1"))
 
-    async with aiohttp.ClientSession() as session:
-
-        tasks = []
-        for number in range(1, 151):
-            url = f'https://pokeapi.co/api/v2/pokemon/{number}'
-            tasks.append(asyncio.ensure_future(get_pokemon(session, url)))
-
-        original_pokemon = await asyncio.gather(*tasks)
-        for pokemon in original_pokemon:
-            print(pokemon)
-
-asyncio.run(main())
-print("--- 6.0451245412 seconds --- for 50 messages")
+print(res)

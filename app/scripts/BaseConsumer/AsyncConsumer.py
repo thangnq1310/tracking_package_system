@@ -3,6 +3,7 @@ import aiohttp
 import os
 import time
 import logging
+from functools import reduce
 
 import redis
 from confluent_kafka import Producer
@@ -97,19 +98,33 @@ class AsyncConsumer:
     async def get_task(self, session, msg):
         base_url = os.getenv('WEBHOOK_URL')
         url = base_url + msg['webhook_url']
+        shop_id = msg['shop_id']
         params = {
             'pkg_code': msg['pkg_code'],
             'package_status_id': msg['package_status_id'],
         }
 
         try:
+            start_request = time.time()
             async with session.post(url, json=params, ssl=False, timeout=self.timeout_request) as response:
                 response_webhook = await response.json()
+                print("RESPONSE:", response_webhook)
+                end_result = time.time()
+                response_time = round(end_result - start_request, 2)
 
-                print(response_webhook)
-        except (TimeoutError, Exception):
+                shop_cached = json.loads(self.cache.get(shop_id))
+                time_responses = shop_cached['time_responses'] if 'time_responses' in shop_cached.keys() else []
+
+                if shop_cached:
+                    time_responses.append(response_time)
+                    recalculated = reduce(lambda x, y: x + y, time_responses) / len(time_responses)
+                    shop_cached['time_responses'] = time_responses
+                    shop_cached['avg_response'] = recalculated
+                    self.cache.set(shop_id, json.dumps(shop_cached))
+
+        except (TimeoutError, Exception) as e:
             self.switch_topic(self.package_data)
-            print("Timeout for waiting for response, this request will be switched to alternative topic")
+            print("Timeout for waiting for response, this request will be switched to alternative topic", e)
 
     def decode_message(self, msg):
         try:
@@ -159,30 +174,19 @@ class AsyncConsumer:
     def cache_message(self, package_data):
         try:
             # cache shop
-            shop_response_time = self.cache.get(package_data['shop_id'])
-            shop_response_time = json.loads(shop_response_time) if shop_response_time else None
+            shop_cached = self.cache.get(package_data['shop_id'])
+            shop_cached = json.loads(shop_cached) if shop_cached else None
 
-            package_data['webhook_url'] = shop_response_time['webhook_url'] if shop_response_time else None
+            package_data['webhook_url'] = shop_cached['webhook_url'] if shop_cached else None
 
-            if shop_response_time is None:
-                shop = db.query(Shops.webhook_url, Shops.name) \
-                    .filter(Shops.id == package_data['shop_id']).first()
+            if shop_cached is None:
+                shop = db.query(Shops.webhook_url).filter(Shops.id == package_data['shop_id']).first()
                 shop = dict(shop)
-                shop_name = shop['name']
-                if shop_name == 'Alpha':
-                    shop['cache_time'] = 2
-                elif shop_name == 'Beta':
-                    shop['cache_time'] = 10
-                else:
-                    shop['cache_time'] = 5
-
                 package_data['webhook_url'] = shop['webhook_url']
-                self.cache.set(package_data['shop_id'], json.dumps(shop))
-
+                self.cache.set(package_data['shop_id'], json.dumps({'webhook_url': shop['webhook_url']}))
                 return True
 
-            cache_time = shop_response_time['cache_time']
-
+            cache_time = shop_cached['avg_response']
             if 5 > cache_time >= 2:
                 print(f'This message has been cached and will stay in {self.topic} topic')
                 return True
@@ -192,7 +196,6 @@ class AsyncConsumer:
             else:
                 print('This message has been cached, switch message to', constants.RANK_TOPIC[2])
                 self.producer_topic(constants.RANK_TOPIC[2], package_data)
-
             return False
 
         except (ValueError, Exception):
