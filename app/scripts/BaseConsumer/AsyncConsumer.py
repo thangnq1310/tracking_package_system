@@ -136,7 +136,7 @@ class AsyncConsumer:
 
             rs = self.format_message()
             if rs is False:
-                print('No need process message because status does not change')
+                print('No need to process message because status does not change')
 
             current_topic = self.cache_message(self.package_data)
 
@@ -183,20 +183,25 @@ class AsyncConsumer:
                 shop = db.query(Shops.webhook_url).filter(Shops.id == package_data['shop_id']).first()
                 shop = dict(shop)
                 package_data['webhook_url'] = shop['webhook_url']
-                self.cache.set(package_data['shop_id'], json.dumps({'webhook_url': shop['webhook_url']}))
+                payload = {'webhook_url': shop['webhook_url'], 'time_responses': [], 'avg_response': None}
+                self.cache.set(package_data['shop_id'], json.dumps(payload))
                 return True
 
             cache_time = shop_cached['avg_response']
-            if 5 > cache_time >= 2:
-                print(f'This message has been cached and will stay in {self.topic} topic')
-                return True
-            elif 5 <= cache_time < 10:
-                print('This message has been cached, switch message to', constants.RANK_TOPIC[1])
-                self.producer_topic(constants.RANK_TOPIC[1], package_data)
-            else:
-                print('This message has been cached, switch message to', constants.RANK_TOPIC[2])
-                self.producer_topic(constants.RANK_TOPIC[2], package_data)
-            return False
+
+            if cache_time:
+                if 3 > cache_time:
+                    print(f'This message has been cached and will stay in {self.topic} topic')
+                    return True
+                elif 3 <= cache_time < 10:
+                    print('This message has been cached, switch message to', constants.RANK_TOPIC[1])
+                    self.producer_topic(constants.RANK_TOPIC[1], package_data)
+                else:
+                    print('This message has been cached, switch message to', constants.RANK_TOPIC[2])
+                    self.producer_topic(constants.RANK_TOPIC[2], package_data)
+                return False
+
+            return True
 
         except (ValueError, Exception):
             logging.error('Has an error when caching', exc_info=True)

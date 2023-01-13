@@ -109,12 +109,15 @@ class AsyncConsumerLow:
         }
 
         try:
+            start_request = time.time()
             async with session.post(url, json=params, ssl=False, timeout=self.timeout_request) as response:
                 response_webhook = await response.json()
-                response_time = round(response_webhook.elapsed.total_seconds(), 2)
+                print("RESPONSE:", response_webhook)
+                end_result = time.time()
+                response_time = round(end_result - start_request, 2)
 
                 shop_cached = json.loads(self.cache.get(shop_id))
-                time_responses = shop_cached['time_responses']
+                time_responses = shop_cached['time_responses'] if 'time_responses' in shop_cached.keys() else []
 
                 if shop_cached:
                     time_responses.append(response_time)
@@ -122,9 +125,9 @@ class AsyncConsumerLow:
                     shop_cached['time_responses'] = time_responses
                     shop_cached['avg_response'] = recalculated
                     self.cache.set(shop_id, json.dumps(shop_cached))
-        except (TimeoutError, Exception):
+        except (TimeoutError, Exception) as e:
             self.switch_topic(self.package_data)
-            print("Timeout for waiting for response, this request will be switched to alternative topic")
+            print("Timeout for waiting for response, this request will be switched to alternative topic", e)
 
     def switch_topic(self, message):
         rank_topic = constants.RANK_TOPIC
