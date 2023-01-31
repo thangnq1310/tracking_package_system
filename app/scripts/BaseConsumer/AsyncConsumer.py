@@ -44,8 +44,8 @@ class AsyncConsumer:
 
     def init_redis(self):
         self.cache = redis.Redis(
-            host='redis',
-            port=6379
+            host=os.getenv('REDIS_HOST', 'redis'),
+            port=os.getenv('REDIS_PORT', 6379)
         )
 
     def init_producer(self):
@@ -77,8 +77,10 @@ class AsyncConsumer:
                 else:
                     for _, raw_message in messages.items():
                         for message in raw_message:
-                            current_topic = self.decode_message(message)
-                            if not current_topic:
+                            self.decode_message(message)
+                            is_current_topic = self.cache_message(self.package_data)
+
+                            if not is_current_topic:
                                 continue
                             self.list_msg.append(self.package_data)
 
@@ -123,7 +125,7 @@ class AsyncConsumer:
                     self.cache.set(shop_id, json.dumps(shop_cached))
 
         except (TimeoutError, Exception) as e:
-            self.switch_topic(self.package_data)
+            self.switch_topic(msg)
             print("Timeout for waiting for response, this request will be switched to alternative topic", e)
 
     def decode_message(self, msg):
@@ -138,12 +140,8 @@ class AsyncConsumer:
             if rs is False:
                 print('No need to process message because status does not change')
 
-            current_topic = self.cache_message(self.package_data)
-
-            print("Package with code:", self.package_data['pkg_code'],
-                  "and status:", self.package_data['package_status_id'])
-
-            return current_topic
+            print("Package with code:", self.package_data['pkg_code'], "and status:",
+                  self.package_data['package_status_id'])
         except (ValueError, Exception):
             logging.error("Cannot parse message because invalid format", exc_info=True)
 

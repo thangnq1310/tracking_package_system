@@ -41,8 +41,8 @@ class AsyncConsumerLow:
 
     def init_redis(self):
         self.cache = redis.Redis(
-            host='redis',
-            port=6379
+            host=os.getenv('REDIS_HOST', 'redis'),
+            port=os.getenv('REDIS_PORT', 6379)
         )
 
     def init_producer(self):
@@ -126,7 +126,7 @@ class AsyncConsumerLow:
                     shop_cached['avg_response'] = recalculated
                     self.cache.set(shop_id, json.dumps(shop_cached))
         except (TimeoutError, Exception) as e:
-            self.switch_topic(self.package_data)
+            self.switch_topic(msg)
             print("Timeout for waiting for response, this request will be switched to alternative topic", e)
 
     def switch_topic(self, message):

@@ -21,7 +21,7 @@ app.post('/alpha', async (req, res) => {
 app.post('/beta', async (req, res) => {
     console.log(req.body)
 
-    await delay(5000)
+    await delay(25000)
 
     return res.json({
         'success': true,
