@@ -61,7 +61,7 @@ class AsyncConsumer:
         client = KafkaConsumer(
             self.topic,
             bootstrap_servers=brokers,
-            auto_offset_reset='latest',
+            auto_offset_reset='earliest',
             enable_auto_commit=True,
             group_id=self.group,
             max_poll_records=self.limit_msg

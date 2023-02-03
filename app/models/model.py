@@ -18,7 +18,7 @@ class Packages(Base):
     current_station_id = Column(Integer, ForeignKey('stations.id'))
     customer_id = Column(Integer, ForeignKey('customers.id'))
     status = Column(Integer)
-    pkg_order = Column(String(4), unique=True, nullable=False)
+    pkg_order = Column(String(6), unique=True, nullable=False)
 
 
 class Shops(Base):

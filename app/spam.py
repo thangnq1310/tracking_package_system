@@ -11,7 +11,7 @@ pkg_orders = list(session.query(Packages.pkg_order, Packages.status).all())
 
 cnt = 0
 for i in range(0, 5):
-    for j in range(0, 100):
+    for j in range(0, 2000):
         cnt += 1
         random_order = random.choice(pkg_orders)
         pkg_code = random_order[0]
