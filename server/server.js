@@ -8,9 +8,16 @@ app.use(express.json())
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 app.post('/alpha', async (req, res) => {
-    console.log(req.body)
+    let pkg = req.body;
 
     await delay(2000)
+
+    if (pkg && pkg.package_status_id >= 5) {
+        return res.status(500).json({
+            'success': false,
+            'message': 'Alpha receive message failed!'
+        })
+    }
 
     return res.json({
         'success': true,
@@ -21,7 +28,7 @@ app.post('/alpha', async (req, res) => {
 app.post('/beta', async (req, res) => {
     console.log(req.body)
 
-    await delay(25000)
+    await delay(5000)
 
     return res.json({
         'success': true,
