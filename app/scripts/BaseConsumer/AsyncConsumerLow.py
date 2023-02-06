@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 import ujson as json
 
 import constants
+from retry_webhook import RetryWebhook
 
 load_dotenv()
 
@@ -27,9 +28,7 @@ class AsyncConsumerLow:
         self.topic = None
         self.group = None
         self.list_msg = []
-        self.limit_msg = 50
-        self.timeout_msg = 5000
-        self.timeout_request = 5
+        self.timeout_request = 3
         self.package_data = None
         self.producer = None
         self.cache = None
@@ -61,12 +60,12 @@ class AsyncConsumerLow:
             auto_offset_reset='earliest',
             enable_auto_commit=True,
             group_id=self.group,
-            max_poll_records=self.limit_msg
+            max_poll_records=constants.LIMIT_MSG
         )
 
         while True:
             try:
-                messages = client.poll(self.timeout_msg)
+                messages = client.poll(constants.TIMEOUT_MSG)
 
                 is_timeout = False
                 if not messages:
@@ -77,7 +76,7 @@ class AsyncConsumerLow:
                             self.process_msg(message)
                             self.list_msg.append(self.package_data)
 
-                if len(self.list_msg) >= self.limit_msg \
+                if len(self.list_msg) >= constants.LIMIT_MSG \
                         or is_timeout and len(self.list_msg) > 0:
                     async with aiohttp.ClientSession() as session:
                         start_time = time.time()
@@ -88,7 +87,7 @@ class AsyncConsumerLow:
                         time_metrics = time.time() - start_time
                         print(f"TOTAL TIME FOR PROCESSING MESSAGES TO WEBHOOK: ", time_metrics)
             except (TimeoutError, Exception):
-                logging.error(f"Timeout because not getting any message after {self.timeout_msg}", exc_info=True)
+                logging.error(f"Timeout because not getting any message after {constants.TIMEOUT_MSG}", exc_info=True)
 
     def process_msg(self, msg):
         try:
@@ -111,23 +110,38 @@ class AsyncConsumerLow:
         try:
             start_request = time.time()
             async with session.post(url, json=params, ssl=False, timeout=self.timeout_request) as response:
+                response_status = response.status
+                if response_status in constants.STATUS_ALLOW:
+                    retry_webhook = RetryWebhook(topic=self.topic, brokers=self.brokers)
+                    retry_webhook.retry(params['pkg_code'], response_status, params)
                 response_webhook = await response.json()
                 print("RESPONSE:", response_webhook)
                 end_result = time.time()
                 response_time = round(end_result - start_request, 2)
+                self.calculate_avg_response(shop_id, response_time)
 
-                shop_cached = json.loads(self.cache.get(shop_id))
-                time_responses = shop_cached['time_responses'] if 'time_responses' in shop_cached.keys() else []
-
-                if shop_cached:
-                    time_responses.append(response_time)
-                    recalculated = reduce(lambda x, y: x + y, time_responses) / len(time_responses)
-                    shop_cached['time_responses'] = time_responses
-                    shop_cached['avg_response'] = recalculated
-                    self.cache.set(shop_id, json.dumps(shop_cached))
         except (TimeoutError, Exception) as e:
             self.switch_topic(msg)
             print("Timeout for waiting for response, this request will be switched to alternative topic", e)
+
+    def calculate_avg_response(self, shop_id, response_time):
+        shop_cached = json.loads(self.cache.get(shop_id))
+        time_responses = shop_cached['time_responses'] if 'time_responses' in shop_cached.keys() else []
+        total_responses = shop_cached['total_responses'] if 'total_responses' in shop_cached.keys() else None
+
+        if shop_cached:
+            time_responses.append(response_time)
+            if len(time_responses) < constants.LIMIT_REDIS_MSG:
+                total_responses = reduce(lambda x, y: x + y, time_responses)
+            else:
+                first_response = time_responses.pop(0)
+                total_responses = total_responses - first_response + response_time
+
+            recalculated = total_responses / len(time_responses)
+            shop_cached['time_responses'] = time_responses
+            shop_cached['total_responses'] = total_responses
+            shop_cached['avg_response'] = recalculated
+            self.cache.set(shop_id, json.dumps(shop_cached))
 
     def switch_topic(self, message):
         rank_topic = constants.RANK_TOPIC

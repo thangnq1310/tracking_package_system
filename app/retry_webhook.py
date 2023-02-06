@@ -4,10 +4,10 @@ import ujson as json
 
 
 class RetryWebhook:
-    def __init__(self):
-        self.topic = os.getenv('HANDLE_KAFKA_TOPIC_JSON', 'cs_webhook_handle_json_topic_local')
-        self.brokers = os.getenv('HANDLE_KAFKA_BROKERS', '10.120.80.37:9092,10.120.80.38:9092,10.120.80.39:9092')
-        self.producer = Producer({'bootstrap.servers': self.brokers})
+    def __init__(self, topic, brokers):
+        self.topic = topic
+        self.brokers = brokers
+        self.producer = Producer({'bootstrap.servers': brokers})
         self.response = {}
 
     def retry(self, package_order, status_id, package_data: dict):
@@ -15,12 +15,12 @@ class RetryWebhook:
             pkg_order=package_order,
             status_id=status_id,
             package_data=package_data,
-            retry=1,
+            is_retry=1,
             ts_ms=package_data['ts_ms'] if 'ts_ms' in package_data.keys() else None
         )
         self.producer.poll(0)
         msg = json.dumps(data).encode('utf-8')
-        self.producer.produce(self.topic, msg, callback=self.build_response)
+        self.producer.produce(self.topic, msg, callback=self.build_response, key=package_order)
         self.producer.flush()
 
         return self.response

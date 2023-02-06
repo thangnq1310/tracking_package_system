@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import ujson as json
 
 import constants
+from retry_webhook import RetryWebhook
 from models.base import session as db
 from models.model import Shops
 
@@ -28,9 +29,6 @@ class AsyncConsumer:
         self.topic = os.getenv('PACKAGE_TOPIC', 'connector.logistic.packages')
         self.group = os.getenv('PACKAGE_GROUP', 'package_group')
         self.list_msg = []
-        self.limit_msg = 50
-        self.timeout_msg = 5000
-        self.timeout_request = 3
         self.package_data = None
         self.raw_package_data = None
         self.ts_ms = None
@@ -64,12 +62,12 @@ class AsyncConsumer:
             auto_offset_reset='earliest',
             enable_auto_commit=True,
             group_id=self.group,
-            max_poll_records=self.limit_msg
+            max_poll_records=constants.LIMIT_MSG
         )
 
         while True:
             try:
-                messages = client.poll(self.timeout_msg)
+                messages = client.poll(constants.TIMEOUT_MSG)
 
                 is_timeout = False
                 if not messages:
@@ -84,7 +82,7 @@ class AsyncConsumer:
                                 continue
                             self.list_msg.append(self.package_data)
 
-                if len(self.list_msg) >= self.limit_msg \
+                if len(self.list_msg) >= constants.LIMIT_MSG \
                         or is_timeout and len(self.list_msg) > 0:
                     async with aiohttp.ClientSession() as session:
                         start_time = time.time()
@@ -95,38 +93,7 @@ class AsyncConsumer:
                         time_metrics = time.time() - start_time
                         print(f"TOTAL TIME FOR PROCESSING MESSAGES TO WEBHOOK: ", time_metrics)
             except (TimeoutError, Exception):
-                logging.error(f"Timeout because not getting any message after {self.timeout_msg}", exc_info=True)
-
-    async def get_task(self, session, msg):
-        base_url = os.getenv('WEBHOOK_URL')
-        url = base_url + msg['webhook_url']
-        shop_id = msg['shop_id']
-        params = {
-            'pkg_code': msg['pkg_code'],
-            'package_status_id': msg['package_status_id'],
-        }
-
-        try:
-            start_request = time.time()
-            async with session.post(url, json=params, ssl=False, timeout=self.timeout_request) as response:
-                response_webhook = await response.json()
-                print("RESPONSE:", response_webhook)
-                end_result = time.time()
-                response_time = round(end_result - start_request, 2)
-
-                shop_cached = json.loads(self.cache.get(shop_id))
-                time_responses = shop_cached['time_responses'] if 'time_responses' in shop_cached.keys() else []
-
-                if shop_cached:
-                    time_responses.append(response_time)
-                    recalculated = reduce(lambda x, y: x + y, time_responses) / len(time_responses)
-                    shop_cached['time_responses'] = time_responses
-                    shop_cached['avg_response'] = recalculated
-                    self.cache.set(shop_id, json.dumps(shop_cached))
-
-        except (TimeoutError, Exception) as e:
-            self.switch_topic(msg)
-            print("Timeout for waiting for response, this request will be switched to alternative topic", e)
+                logging.error(f"Timeout because not getting any message after {constants.TIMEOUT_MSG}", exc_info=True)
 
     def decode_message(self, msg):
         try:
@@ -134,7 +101,8 @@ class AsyncConsumer:
             if 'payload' in self.raw_package_data:
                 self.raw_package_data = self.raw_package_data['payload']
 
-            self.ts_ms = str(self.raw_package_data['source']['ts_ms'])
+            self.ts_ms = str(self.raw_package_data['source']['ts_ms']) if 'source' \
+                                in self.raw_package_data.keys() else self.raw_package_data['ts_ms']
 
             rs = self.format_message()
             if rs is False:
@@ -146,28 +114,43 @@ class AsyncConsumer:
             logging.error("Cannot parse message because invalid format", exc_info=True)
 
     def format_message(self):
-        package_data = self.raw_package_data['after']
-
-        before_data = {
-            'package_status_id': None
-        }
-        if 'before' in self.raw_package_data and self.raw_package_data['before'] is not None:
-            before_data = {
-                'package_status_id': self.raw_package_data['before']['status']
+        is_retry = self.raw_package_data['is_retry'] if 'is_retry' in self.raw_package_data.keys() else 0
+        if is_retry:
+            package_data = self.raw_package_data['package_data']
+            self.package_data = {
+                'id': package_data['id'],
+                'pkg_code': package_data['pkg_code'],
+                'package_status_id': package_data['package_status_id'],
+                'shop_id': package_data['shop_id'],
+                'customer_id': package_data['customer_id'],
+                'before_data': package_data['before_data'],
+                'current_station_id': package_data['current_station_id'],
+                'ts_ms': package_data['ts_ms'],
+                'op': package_data['op']
             }
+            return True
+        else:
+            package_data = self.raw_package_data['after']
+            before_data = {
+                'package_status_id': None
+            }
+            if 'before' in self.raw_package_data and self.raw_package_data['before'] is not None:
+                before_data = {
+                    'package_status_id': self.raw_package_data['before']['status']
+                }
 
-        self.package_data = {
-            'id': package_data['id'],
-            'pkg_code': package_data['pkg_order'],
-            'package_status_id': package_data['status'],
-            'shop_id': package_data['shop_id'],
-            'customer_id': package_data['customer_id'],
-            'current_station_id': package_data['current_station_id'],
-            'before_data': before_data,
-            'ts_ms': self.ts_ms,
-            'op': self.raw_package_data['op']
-        }
-        return True
+            self.package_data = {
+                'id': package_data['id'],
+                'pkg_code': package_data['pkg_order'],
+                'package_status_id': package_data['status'],
+                'shop_id': package_data['shop_id'],
+                'customer_id': package_data['customer_id'],
+                'current_station_id': package_data['current_station_id'],
+                'before_data': before_data,
+                'ts_ms': self.ts_ms,
+                'op': self.raw_package_data['op']
+            }
+            return True
 
     def cache_message(self, package_data):
         try:
@@ -203,6 +186,51 @@ class AsyncConsumer:
 
         except (ValueError, Exception):
             logging.error('Has an error when caching', exc_info=True)
+
+    def calculate_avg_response(self, shop_id, response_time):
+        shop_cached = json.loads(self.cache.get(shop_id))
+        time_responses = shop_cached['time_responses'] if 'time_responses' in shop_cached.keys() else []
+        total_responses = shop_cached['total_responses'] if 'total_responses' in shop_cached.keys() else None
+
+        if shop_cached:
+            time_responses.append(response_time)
+            if len(time_responses) < constants.LIMIT_REDIS_MSG:
+                total_responses = reduce(lambda x, y: x + y, time_responses)
+            else:
+                first_response = time_responses.pop(0)
+                total_responses = total_responses - first_response + response_time
+
+            recalculated = total_responses / len(time_responses)
+            shop_cached['time_responses'] = time_responses
+            shop_cached['total_responses'] = total_responses
+            shop_cached['avg_response'] = recalculated
+            self.cache.set(shop_id, json.dumps(shop_cached))
+
+    async def get_task(self, session, msg):
+        base_url = os.getenv('WEBHOOK_URL')
+        url = base_url + msg['webhook_url']
+        shop_id = msg['shop_id']
+        params = {
+            'pkg_code': msg['pkg_code'],
+            'package_status_id': msg['package_status_id'],
+        }
+
+        try:
+            start_request = time.time()
+            async with session.post(url, json=params, ssl=False, timeout=constants.TIMEOUT_REQUEST) as response:
+                response_status = response.status
+                if response_status in constants.STATUS_ALLOW:
+                    retry_webhook = RetryWebhook(topic=self.topic, brokers=self.brokers)
+                    retry_webhook.retry(msg['pkg_code'], response_status, msg)
+                response_webhook = await response.json()
+                print("RESPONSE:", response_webhook)
+                end_result = time.time()
+                response_time = round(end_result - start_request, 2)
+                self.calculate_avg_response(shop_id, response_time)
+
+        except (TimeoutError, Exception) as e:
+            self.switch_topic(msg)
+            print("Timeout for waiting for response, this request will be switched to alternative topic", e)
 
     def switch_topic(self, message):
         rank_topic = constants.RANK_TOPIC
