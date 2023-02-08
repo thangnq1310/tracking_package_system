@@ -130,9 +130,16 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-
 # IDE
 .idea
+
+*.pyc
+
+*/*/*/__pycache__/
+
+*/*/__pycache__/
+
+*/__pycache__/
 
 supervisord.pid
 supervisord.log
