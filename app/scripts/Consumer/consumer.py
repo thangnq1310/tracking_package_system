@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 
 from models.base import session as db
 from models.model import *
-import constants
 import ujson as json
 
 load_dotenv()
@@ -74,6 +73,7 @@ class ConsumerKafka:
                 'pkg_code': msg['pkg_code'],
                 'status': msg['package_status_id']
             }
+            print('Package with pkg_code', msg['pkg_code'], 'and status', msg['package_status_id'])
 
             shop = db.query(Shops.webhook_url).filter(Shops.id == msg['shop_id']).first()
             shop = dict(shop)
@@ -81,7 +81,7 @@ class ConsumerKafka:
             url = os.getenv('WEBHOOK_URL') + webhook_url
 
             response = requests.post(url, data=params)
-            print("RESPONSE:", response)
+            print("RESPONSE:", response.text, "in", str(response.elapsed.total_seconds()), 'seconds')
 
         except Exception as e:
             print('[EXCEPTION] Has an error when post to webhook: ' + str(e))
