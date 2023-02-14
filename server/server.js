@@ -1,7 +1,7 @@
 const express = require('express')
 const app = express()
 const logger = require('morgan');
-const port = 8080
+const port = 8088
 
 app.use(logger('dev'))
 app.use(express.json())

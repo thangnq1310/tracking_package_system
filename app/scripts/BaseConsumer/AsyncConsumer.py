@@ -162,9 +162,8 @@ class AsyncConsumer:
 
             if shop_cached is None:
                 shop = db.query(Shops.webhook_url).filter(Shops.id == package_data['shop_id']).first()
-                shop = dict(shop)
-                package_data['webhook_url'] = shop['webhook_url']
-                payload = {'webhook_url': shop['webhook_url'], 'time_responses': [], 'avg_response': None}
+                package_data['webhook_url'] = shop[0] if shop else None
+                payload = {'webhook_url': package_data['webhook_url'], 'time_responses': [], 'avg_response': None}
                 self.cache.set(package_data['shop_id'], json.dumps(payload))
                 return True
 

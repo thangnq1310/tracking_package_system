@@ -1,3 +1,5 @@
+import json
+
 from locust import HttpUser, TaskSet, task
 
 class Message(HttpUser):
