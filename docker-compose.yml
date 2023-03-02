@@ -1,5 +1,67 @@
 version: '3'
 services:
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.4.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    volumes:
+      - "./kibana.yml:/usr/share/kibana/config/kibana.yml"
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    container_name: kibana
+    depends_on:
+      - elasticsearch
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.4.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    container_name: elasticsearch
+    restart: unless-stopped
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - "./esdata:/var/lib/elasticsearch/data"
+    ports:
+      - "9200:9200"
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.4.0
+    volumes:
+      - "./logstash.conf:/config-dir/logstash.conf"
+    restart: unless-stopped
+    command: logstash -f /config-dir/logstash.conf
+    ports:
+      - "9600:9600"
+      - "7777:7777"
+    container_name: logstash
+    depends_on:
+      - elasticsearch
+      - kafka1
+      - kafka2
+      - kafka3
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana:/var/lib/grafana
+
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     hostname: zookeeper
@@ -96,6 +158,7 @@ services:
       - KAFKA_CLUSTERS_0_NAME=local
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=${BOOTSTRAP_SERVERS}
     container_name: ui_kafka
+    restart: unless-stopped
     depends_on:
       - zookeeper
 

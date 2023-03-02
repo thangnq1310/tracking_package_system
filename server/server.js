@@ -8,10 +8,9 @@ app.use(express.json())
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 app.post('/alpha', async (req, res) => {
+    await delay(1000)
+
     let pkg = req.body;
-
-    await delay(2000)
-
     if (pkg && pkg.package_status_id >= 5) {
         return res.status(500).json({
             'success': false,
@@ -26,9 +25,15 @@ app.post('/alpha', async (req, res) => {
 })
 
 app.post('/beta', async (req, res) => {
-    console.log(req.body)
+    await delay(2000)
 
-    await delay(5000)
+    let pkg = req.body;
+    if (pkg && pkg.package_status_id >= 5) {
+        return res.status(500).json({
+            'success': false,
+            'message': 'Beta receive message failed!'
+        })
+    }
 
     return res.json({
         'success': true,
@@ -37,9 +42,15 @@ app.post('/beta', async (req, res) => {
 })
 
 app.post('/gamma', async (req, res) => {
-    console.log(req.body)
+    await delay(4000)
 
-    await delay(10000)
+    let pkg = req.body;
+    if (pkg && pkg.package_status_id >= 5) {
+        return res.status(500).json({
+            'success': false,
+            'message': 'Gamma receive message failed!'
+        })
+    }
 
     return res.json({
         'success': true,

@@ -222,9 +222,10 @@ class AsyncConsumer:
                     retry_webhook = RetryWebhook(topic=self.topic, brokers=self.brokers)
                     retry_webhook.retry(msg['pkg_code'], response_status, msg)
                 response_webhook = await response.json()
-                print("RESPONSE:", response_webhook)
                 end_result = time.time()
                 response_time = round(end_result - start_request, 2)
+                response_log = f"[INFO] Response: {response_webhook} within {str(response_time)} seconds"
+                self.produce_logstash(response_log, pkg_code=params['pkg_code'])
                 self.calculate_avg_response(shop_id, response_time)
 
         except (TimeoutError, Exception) as e:
@@ -245,3 +246,12 @@ class AsyncConsumer:
             self.producer.flush()
         except Exception as e:
             logging.error('Has an error when producer to topic: ' + str(e))
+
+    def produce_logstash(self, msg, pkg_code):
+        try:
+            topic = os.getenv("LOG_STASH_TOPIC", "logstash_topic")
+            self.producer.produce(topic, json.dumps(msg).encode('utf-8'), key=pkg_code)
+            self.producer.poll(10)
+            self.producer.flush()
+        except Exception as e:
+            logging.error('Has an error when producer to topic log stash: ' + str(e))
