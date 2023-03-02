@@ -5,7 +5,7 @@ services:
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     volumes:
-      - "./kibana.yml:/usr/share/kibana/config/kibana.yml"
+      - "./config/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml"
     restart: unless-stopped
     ports:
       - "5601:5601"
@@ -35,7 +35,7 @@ services:
   logstash:
     image: docker.elastic.co/logstash/logstash:7.4.0
     volumes:
-      - "./logstash.conf:/config-dir/logstash.conf"
+      - "./config/logstash/logstash.conf:/config-dir/logstash.conf"
     restart: unless-stopped
     command: logstash -f /config-dir/logstash.conf
     ports:
@@ -44,80 +44,151 @@ services:
     container_name: logstash
     depends_on:
       - elasticsearch
-      - kafka1
-      - kafka2
-      - kafka3
+      - kafka101
+      - kafka102
+      - kafka103
+
+  grafana:
+    image: "grafana/grafana:${GRAFANA_VERSION}"
+    ports:
+      - "3000:3000"
+    environment:
+      GF_PATHS_DATA: /var/lib/grafana
+      GF_SECURITY_ADMIN_PASSWORD: kafka
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    container_name: grafana
+    depends_on:
+      - prometheus
 
   prometheus:
-    image: prom/prometheus
+    image: "prom/prometheus:${PROMETHEUS_VERSION}"
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command: "--config.file=/etc/prometheus/prometheus.yml"
+    container_name: prometheus
 
-  grafana:
-    image: grafana/grafana
+  jmx-kafka101:
+    image: "sscaling/jmx-prometheus-exporter"
     ports:
-      - "3000:3000"
+      - "5556:5556"
+    environment:
+      CONFIG_YML: "/etc/jmx_exporter/config.yml"
+      JVM_OPTS: ${PROMETHEUS_JMX_AGENT_JVM_OPTS}
     volumes:
-      - ./grafana:/var/lib/grafana
+      - ./config/jmx_exporter/config_exporter1.yml:/etc/jmx_exporter/config.yml
+    container_name: jmx-kafka101
+    depends_on:
+      - kafka101
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    hostname: zookeeper
-    container_name: zookeeper
+  jmx-kafka102:
+    image: "sscaling/jmx-prometheus-exporter"
     ports:
-      - "2181:2181"
-    restart: unless-stopped
+      - "5557:5556"
+    environment:
+      CONFIG_YML: "/etc/jmx_exporter/config.yml"
+      JVM_OPTS: ${PROMETHEUS_JMX_AGENT_JVM_OPTS}
+    volumes:
+      - ./config/jmx_exporter/config_exporter2.yml:/etc/jmx_exporter/config.yml
+    container_name: jmx-kafka102
+    depends_on:
+      - kafka102
+
+  jmx-kafka103:
+    image: "sscaling/jmx-prometheus-exporter"
+    ports:
+      - "5558:5556"
+    environment:
+      CONFIG_YML: "/etc/jmx_exporter/config.yml"
+      JVM_OPTS: ${PROMETHEUS_JMX_AGENT_JVM_OPTS}
+    volumes:
+      - ./config/jmx_exporter/config_exporter3.yml:/etc/jmx_exporter/config.yml
+    container_name: jmx-kafka103
+    depends_on:
+      - kafka103
+
+  zk1:
+    image: confluentinc/cp-zookeeper:${CONFLUENT_VERSION}
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_SERVER_ID: 1
-      ZOOKEEPER_SERVERS: zookeeper:2888:3888
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+    ports:
+      - "2181:2181"
+    container_name: zookeeper1
 
-  kafka1:
-    image: confluentinc/cp-kafka:latest
-    hostname: kafka1
-    container_name: kafka1
+  kafka101:
+    image: confluentinc/cp-kafka:${CONFLUENT_VERSION}
+    depends_on:
+      - zk1
+    ports:
+      - "9091:9091"
+      - "9991:9991"
+    container_name: kafka101
+    environment:
+      KAFKA_BROKER_ID: 101
+      KAFKA_JMX_PORT: 9991
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka101:29092,PLAINTEXT_HOST://localhost:9091
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_NUM_PARTITIONS: 3
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka101:29092
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_METRICS_ENABLE: 'false'
+      KAFKA_HEAP_OPTS: ${KAFKA_BROKER_HEAP_OPTS}
+
+  kafka102:
+    image: confluentinc/cp-kafka:${CONFLUENT_VERSION}
+    depends_on:
+      - zk1
     ports:
       - "9092:9092"
+      - "9992:9992"
+    container_name: kafka102
     environment:
-      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      KAFKA_BROKER_ID: 1
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9092
+      KAFKA_BROKER_ID: 102
+      KAFKA_JMX_PORT: 9992
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka102:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_DEFAULT_REPLICATION_FACTOR: 3
-    restart: unless-stopped
-    depends_on:
-      - zookeeper
+      KAFKA_NUM_PARTITIONS: 3
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka102:29092
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_METRICS_ENABLE: 'false'
+      KAFKA_HEAP_OPTS: ${KAFKA_BROKER_HEAP_OPTS}
 
-  kafka2:
-    image: confluentinc/cp-kafka:latest
-    hostname: kafka2
-    container_name: kafka2
+  kafka103:
+    image: confluentinc/cp-kafka:${CONFLUENT_VERSION}
+    depends_on:
+      - zk1
     ports:
       - "9093:9093"
+      - "9993:9993"
+    container_name: kafka103
     environment:
-      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      KAFKA_BROKER_ID: 2
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9093
+      KAFKA_BROKER_ID: 103
+      KAFKA_JMX_PORT: 9993
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka103:29092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_DEFAULT_REPLICATION_FACTOR: 3
-    restart: unless-stopped
-    depends_on:
-      - zookeeper
-
-  kafka3:
-    image: confluentinc/cp-kafka:latest
-    hostname: kafka3
-    container_name: kafka3
-    ports:
-      - "9094:9094"
-    environment:
-      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      KAFKA_BROKER_ID: 3
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:9094
-      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
-    restart: unless-stopped
-    depends_on:
-      - zookeeper
+      KAFKA_NUM_PARTITIONS: 3
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka103:29092
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_METRICS_ENABLE: 'false'
+      KAFKA_HEAP_OPTS: ${KAFKA_BROKER_HEAP_OPTS}
 
   mysql:
     image: mysql:8.0
@@ -137,16 +208,16 @@ services:
     ports:
      - "8083:8083"
     environment:
-     - BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}
+     - BOOTSTRAP_SERVERS=kafka101:29092,kafka102:29092,kafka103:29092
      - GROUP_ID=1
      - CONFIG_STORAGE_TOPIC=${CONFIG_STORAGE_TOPIC}
      - OFFSET_STORAGE_TOPIC=${OFFSET_STORAGE_TOPIC}
      - STATUS_STORAGE_TOPIC=${STATUS_STORAGE_TOPIC}
     container_name: debezium
     depends_on:
-      - kafka1
-      - kafka2
-      - kafka3
+      - kafka101
+      - kafka102
+      - kafka103
       - mysql
     restart: unless-stopped
 
@@ -160,7 +231,7 @@ services:
     container_name: ui_kafka
     restart: unless-stopped
     depends_on:
-      - zookeeper
+      - zk1
 
   app:
     build: ./app

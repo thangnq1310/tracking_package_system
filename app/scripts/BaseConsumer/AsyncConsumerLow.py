@@ -24,7 +24,7 @@ class AsyncConsumerLow:
                  'package_data', 'timeout_msg', 'timeout_request', 'producer', 'cache']
 
     def __init__(self):
-        self.brokers = os.getenv('BOOTSTRAP_SERVERS', 'kafka1:9092,kafka2:9093,kafka3:9094')
+        self.brokers = os.getenv('BOOTSTRAP_SERVERS', 'kafka101:29092,kafka102:29092,kafka103:29092')
         self.topic = None
         self.group = None
         self.list_msg = []
