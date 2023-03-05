@@ -14,7 +14,7 @@ services:
       - elasticsearch
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.4.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.5.2
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -28,7 +28,7 @@ services:
         soft: 65536
         hard: 65536
     volumes:
-      - "./esdata:/var/lib/elasticsearch/data"
+      - "./esdata:/usr/share/elasticsearch/data"
     ports:
       - "9200:9200"
 
@@ -59,6 +59,7 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
     container_name: grafana
+    restart: unless-stopped
     depends_on:
       - prometheus
 
@@ -66,9 +67,14 @@ services:
     image: "prom/prometheus:${PROMETHEUS_VERSION}"
     ports:
       - "9090:9090"
+    user: root
     volumes:
-      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    command: "--config.file=/etc/prometheus/prometheus.yml"
+      - ./config/prometheus:/etc/prometheus
+      - ./prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    restart: unless-stopped
     container_name: prometheus
 
   jmx-kafka101:
@@ -77,10 +83,11 @@ services:
       - "5556:5556"
     environment:
       CONFIG_YML: "/etc/jmx_exporter/config.yml"
-      JVM_OPTS: ${PROMETHEUS_JMX_AGENT_JVM_OPTS}
+      JVM_OPTS: "-Xmx128M"
     volumes:
       - ./config/jmx_exporter/config_exporter1.yml:/etc/jmx_exporter/config.yml
     container_name: jmx-kafka101
+    restart: unless-stopped
     depends_on:
       - kafka101
 
@@ -90,10 +97,11 @@ services:
       - "5557:5556"
     environment:
       CONFIG_YML: "/etc/jmx_exporter/config.yml"
-      JVM_OPTS: ${PROMETHEUS_JMX_AGENT_JVM_OPTS}
+      JVM_OPTS: "-Xmx128M"
     volumes:
       - ./config/jmx_exporter/config_exporter2.yml:/etc/jmx_exporter/config.yml
     container_name: jmx-kafka102
+    restart: unless-stopped
     depends_on:
       - kafka102
 
@@ -103,10 +111,11 @@ services:
       - "5558:5556"
     environment:
       CONFIG_YML: "/etc/jmx_exporter/config.yml"
-      JVM_OPTS: ${PROMETHEUS_JMX_AGENT_JVM_OPTS}
+      JVM_OPTS: "-Xmx128M"
     volumes:
       - ./config/jmx_exporter/config_exporter3.yml:/etc/jmx_exporter/config.yml
     container_name: jmx-kafka103
+    restart: unless-stopped
     depends_on:
       - kafka103
 
@@ -119,6 +128,7 @@ services:
       ZOOKEEPER_SYNC_LIMIT: 2
     ports:
       - "2181:2181"
+    restart: unless-stopped
     container_name: zookeeper1
 
   kafka101:
@@ -129,6 +139,7 @@ services:
       - "9091:9091"
       - "9991:9991"
     container_name: kafka101
+    restart: unless-stopped
     environment:
       KAFKA_BROKER_ID: 101
       KAFKA_JMX_PORT: 9991
@@ -142,7 +153,6 @@ services:
       CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'false'
-      KAFKA_HEAP_OPTS: ${KAFKA_BROKER_HEAP_OPTS}
 
   kafka102:
     image: confluentinc/cp-kafka:${CONFLUENT_VERSION}
@@ -152,6 +162,7 @@ services:
       - "9092:9092"
       - "9992:9992"
     container_name: kafka102
+    restart: unless-stopped
     environment:
       KAFKA_BROKER_ID: 102
       KAFKA_JMX_PORT: 9992
@@ -165,7 +176,6 @@ services:
       CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'false'
-      KAFKA_HEAP_OPTS: ${KAFKA_BROKER_HEAP_OPTS}
 
   kafka103:
     image: confluentinc/cp-kafka:${CONFLUENT_VERSION}
@@ -175,6 +185,7 @@ services:
       - "9093:9093"
       - "9993:9993"
     container_name: kafka103
+    restart: unless-stopped
     environment:
       KAFKA_BROKER_ID: 103
       KAFKA_JMX_PORT: 9993
@@ -188,7 +199,6 @@ services:
       CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'false'
-      KAFKA_HEAP_OPTS: ${KAFKA_BROKER_HEAP_OPTS}
 
   mysql:
     image: mysql:8.0
@@ -227,7 +237,7 @@ services:
       - "8081:8080"
     environment:
       - KAFKA_CLUSTERS_0_NAME=local
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=${BOOTSTRAP_SERVERS}
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka101:29092,kafka102:29092,kafka103:29092
     container_name: ui_kafka
     restart: unless-stopped
     depends_on:
@@ -245,12 +255,22 @@ services:
   server:
     build: ./server
     ports:
-      - "8080:8080"
+      - "8088:8080"
     volumes:
       - ./server:/server
       - /server/node_modules
     restart: always
     container_name: server
+
+  nginx:
+    restart: always
+    build:
+      context: ./nginx
+    ports:
+      - "80:80"
+    container_name: proxy
+    depends_on:
+      - server
 
   redis:
     image: redis:6.2-alpine
@@ -259,6 +279,6 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - ./app/cache:/data
+      - ./cache:/data
     restart: always
     container_name: redis

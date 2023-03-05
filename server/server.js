@@ -25,7 +25,7 @@ app.post('/alpha', async (req, res) => {
 })
 
 app.post('/beta', async (req, res) => {
-    await delay(2000)
+    await delay(1000)
 
     let pkg = req.body;
     if (pkg && pkg.package_status_id >= 5) {
@@ -42,7 +42,7 @@ app.post('/beta', async (req, res) => {
 })
 
 app.post('/gamma', async (req, res) => {
-    await delay(4000)
+    await delay(1000)
 
     let pkg = req.body;
     if (pkg && pkg.package_status_id >= 5) {

@@ -11,13 +11,12 @@ class RetryWebhook:
         self.response = {}
 
     def retry(self, package_order, status_id, package_data: dict):
-        data = dict(
-            pkg_order=package_order,
-            status_id=status_id,
-            package_data=package_data,
-            is_retry=1,
-            ts_ms=package_data['ts_ms'] if 'ts_ms' in package_data.keys() else None
-        )
+        data = {
+            **package_data,
+            'is_retry': 1,
+            'ts_ms': package_data['ts_ms'] if 'ts_ms' in package_data.keys() else None,
+            'status_code': status_id
+        }
         self.producer.poll(0)
         msg = json.dumps(data).encode('utf-8')
         self.producer.produce(self.topic, msg, callback=self.build_response, key=package_order)

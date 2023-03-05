@@ -116,7 +116,7 @@ class AsyncConsumer:
     def format_message(self):
         is_retry = self.raw_package_data['is_retry'] if 'is_retry' in self.raw_package_data.keys() else 0
         if is_retry:
-            package_data = self.raw_package_data['package_data']
+            package_data = self.raw_package_data
             self.package_data = {
                 'id': package_data['id'],
                 'pkg_code': package_data['pkg_code'],
@@ -170,10 +170,10 @@ class AsyncConsumer:
             cache_time = shop_cached['avg_response']
 
             if cache_time:
-                if 3 > cache_time:
+                if 2 > cache_time:
                     print(f'This message has been cached and will stay in {self.topic} topic')
                     return True
-                elif 3 <= cache_time < 10:
+                elif 2 < cache_time < 4:
                     print('This message has been cached, switch message to', constants.RANK_TOPIC[1])
                     self.producer_topic(constants.RANK_TOPIC[1], package_data)
                 else:
@@ -221,10 +221,9 @@ class AsyncConsumer:
                 if response_status in constants.STATUS_ALLOW:
                     retry_webhook = RetryWebhook(topic=self.topic, brokers=self.brokers)
                     retry_webhook.retry(msg['pkg_code'], response_status, msg)
-                response_webhook = await response.json()
                 end_result = time.time()
                 response_time = round(end_result - start_request, 2)
-                response_log = f"[INFO] Response: {response_webhook} within {str(response_time)} seconds"
+                response_log = f"[INFO] Response {response}: Receive package {params['pkg_code']} within {str(response_time)} seconds"
                 self.produce_logstash(response_log, pkg_code=params['pkg_code'])
                 self.calculate_avg_response(shop_id, response_time)
 

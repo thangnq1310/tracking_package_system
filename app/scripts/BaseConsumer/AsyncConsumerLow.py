@@ -90,6 +90,7 @@ class AsyncConsumerLow:
                 logging.error(f"Timeout because not getting any message after {constants.TIMEOUT_MSG}", exc_info=True)
 
     def process_msg(self, msg):
+        print(msg, "MSG >>")
         try:
             self.package_data = json.loads(msg.value.decode('utf-8'))
 
@@ -100,6 +101,7 @@ class AsyncConsumerLow:
 
     async def get_task(self, session, msg):
         base_url = os.getenv('WEBHOOK_URL')
+        print(msg, "MSG RETRY >>")
         url = base_url + msg['webhook_url']
         shop_id = msg['shop_id']
         params = {
@@ -113,11 +115,11 @@ class AsyncConsumerLow:
                 response_status = response.status
                 if response_status in constants.STATUS_ALLOW:
                     retry_webhook = RetryWebhook(topic=self.topic, brokers=self.brokers)
-                    retry_webhook.retry(params['pkg_code'], response_status, params)
-                response_webhook = await response.json()
+                    retry_webhook.retry(params['pkg_code'], response_status, msg)
+                    print("Retry send package", params['pkg_code'])
                 end_result = time.time()
                 response_time = round(end_result - start_request, 2)
-                response_log = f"[INFO] Response: {response_webhook} within {str(response_time)} seconds"
+                response_log = f"[INFO] Response {response}: Receive package {params['pkg_code']} within {str(response_time)} seconds"
                 self.produce_logstash(response_log, pkg_code=params['pkg_code'])
                 self.calculate_avg_response(shop_id, response_time)
 
