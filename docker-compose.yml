@@ -1,9 +1,9 @@
 version: '3'
 services:
   kibana:
-    image: docker.elastic.co/kibana/kibana:7.4.0
+    image: docker.elastic.co/kibana/kibana:${KIBANA_VERSION}
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS}
     volumes:
       - "./config/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml"
     restart: unless-stopped
@@ -14,7 +14,7 @@ services:
       - elasticsearch
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.5.2
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -28,12 +28,12 @@ services:
         soft: 65536
         hard: 65536
     volumes:
-      - "./esdata:/usr/share/elasticsearch/data"
+      - "./data/esdata:/usr/share/elasticsearch/data"
     ports:
       - "9200:9200"
 
   logstash:
-    image: docker.elastic.co/logstash/logstash:7.4.0
+    image: docker.elastic.co/logstash/logstash:${KIBANA_VERSION}
     volumes:
       - "./config/logstash/logstash.conf:/config-dir/logstash.conf"
     restart: unless-stopped
@@ -49,28 +49,28 @@ services:
       - kafka103
 
   grafana:
-    image: "grafana/grafana:${GRAFANA_VERSION}"
+    image: grafana/grafana:${GRAFANA_VERSION}
     ports:
       - "3000:3000"
     environment:
       GF_PATHS_DATA: /var/lib/grafana
-      GF_SECURITY_ADMIN_PASSWORD: kafka
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
     volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
     container_name: grafana
     restart: unless-stopped
     depends_on:
       - prometheus
 
   prometheus:
-    image: "prom/prometheus:${PROMETHEUS_VERSION}"
+    image: prom/prometheus:${PROMETHEUS_VERSION}
     ports:
       - "9090:9090"
     user: root
     volumes:
       - ./config/prometheus:/etc/prometheus
-      - ./prometheus_data:/prometheus
+      - ./data/prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -78,12 +78,12 @@ services:
     container_name: prometheus
 
   jmx-kafka101:
-    image: "sscaling/jmx-prometheus-exporter"
+    image: sscaling/jmx-prometheus-exporter
     ports:
       - "5556:5556"
     environment:
       CONFIG_YML: "/etc/jmx_exporter/config.yml"
-      JVM_OPTS: "-Xmx128M"
+      JVM_OPTS: ${JVM_OPTS}
     volumes:
       - ./config/jmx_exporter/config_exporter1.yml:/etc/jmx_exporter/config.yml
     container_name: jmx-kafka101
@@ -92,12 +92,12 @@ services:
       - kafka101
 
   jmx-kafka102:
-    image: "sscaling/jmx-prometheus-exporter"
+    image: sscaling/jmx-prometheus-exporter
     ports:
       - "5557:5556"
     environment:
       CONFIG_YML: "/etc/jmx_exporter/config.yml"
-      JVM_OPTS: "-Xmx128M"
+      JVM_OPTS: ${JVM_OPTS}
     volumes:
       - ./config/jmx_exporter/config_exporter2.yml:/etc/jmx_exporter/config.yml
     container_name: jmx-kafka102
@@ -106,12 +106,12 @@ services:
       - kafka102
 
   jmx-kafka103:
-    image: "sscaling/jmx-prometheus-exporter"
+    image: sscaling/jmx-prometheus-exporter
     ports:
       - "5558:5556"
     environment:
       CONFIG_YML: "/etc/jmx_exporter/config.yml"
-      JVM_OPTS: "-Xmx128M"
+      JVM_OPTS: ${JVM_OPTS}
     volumes:
       - ./config/jmx_exporter/config_exporter3.yml:/etc/jmx_exporter/config.yml
     container_name: jmx-kafka103
@@ -143,14 +143,14 @@ services:
     environment:
       KAFKA_BROKER_ID: 101
       KAFKA_JMX_PORT: 9991
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:2181
+      KAFKA_ZOOKEEPER_CONNECT: ${ZOOKEEPER_HOST}
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka101:29092,PLAINTEXT_HOST://localhost:9091
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_DEFAULT_REPLICATION_FACTOR: 3
       KAFKA_NUM_PARTITIONS: 3
       CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka101:29092
-      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: ${ZOOKEEPER_HOST}
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'false'
 
@@ -166,14 +166,14 @@ services:
     environment:
       KAFKA_BROKER_ID: 102
       KAFKA_JMX_PORT: 9992
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:2181
+      KAFKA_ZOOKEEPER_CONNECT: ${ZOOKEEPER_HOST}
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka102:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_DEFAULT_REPLICATION_FACTOR: 3
       KAFKA_NUM_PARTITIONS: 3
       CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka102:29092
-      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: ${ZOOKEEPER_HOST}
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'false'
 
@@ -189,14 +189,14 @@ services:
     environment:
       KAFKA_BROKER_ID: 103
       KAFKA_JMX_PORT: 9993
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:2181
+      KAFKA_ZOOKEEPER_CONNECT: ${ZOOKEEPER_HOST}
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka103:29092,PLAINTEXT_HOST://localhost:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_DEFAULT_REPLICATION_FACTOR: 3
       KAFKA_NUM_PARTITIONS: 3
       CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka103:29092
-      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: ${ZOOKEEPER_HOST}
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'false'
 
@@ -210,15 +210,15 @@ services:
      - LANG=C.UTF-8
     container_name: mysql_kafka
     volumes:
-      - ./db/data:/var/lib/mysql
-      - ./db/logistic.sql:/docker-entrypoint-initdb.d/logistic.sql
+      - ./data/db:/var/lib/mysql
+      - ./config/db/logistic.sql:/docker-entrypoint-initdb.d/logistic.sql
 
   connect:
     image: debezium/connect:2.0
     ports:
      - "8083:8083"
     environment:
-     - BOOTSTRAP_SERVERS=kafka101:29092,kafka102:29092,kafka103:29092
+     - BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}
      - GROUP_ID=1
      - CONFIG_STORAGE_TOPIC=${CONFIG_STORAGE_TOPIC}
      - OFFSET_STORAGE_TOPIC=${OFFSET_STORAGE_TOPIC}
@@ -237,7 +237,7 @@ services:
       - "8081:8080"
     environment:
       - KAFKA_CLUSTERS_0_NAME=local
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka101:29092,kafka102:29092,kafka103:29092
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=${BOOTSTRAP_SERVERS}
     container_name: ui_kafka
     restart: unless-stopped
     depends_on:
@@ -251,6 +251,11 @@ services:
       - ./app/:/app
     restart: always
     container_name: app
+    depends_on:
+      - connect
+      - kafka101
+      - kafka102
+      - kafka103
 
   server:
     build: ./server
@@ -279,6 +284,6 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - ./cache:/data
+      - ./data/cache:/data
     restart: always
     container_name: redis

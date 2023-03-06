@@ -154,8 +154,4 @@ app/scripts/BaseConsumer/__pycache__
 server/node_modules
 server/package-lock.json
 
-esdata
-
-cache
-
-prometheus_data
+data/
