@@ -1,14 +1,19 @@
 import asyncio
+import logging
+from functools import reduce
+
 import aiohttp
 import os
 import time
 
+import redis
 from confluent_kafka import Producer
 from kafka import KafkaConsumer
 from dotenv import load_dotenv
 import ujson as json
 
 import constants
+from retry_webhook import RetryWebhook
 
 load_dotenv()
 
@@ -16,22 +21,28 @@ load_dotenv()
 # python worker.py BaseConsumer AsyncConsumerLow
 class AsyncConsumerLow:
     __slots__ = ['list_msg', 'topic', 'brokers', 'group', 'limit_msg',
-                 'package_data', 'timeout_msg', 'timeout_request', 'producer']
+                 'package_data', 'timeout_msg', 'timeout_request', 'producer', 'cache']
 
     def __init__(self):
-        self.brokers = os.getenv('BOOTSTRAP_SERVERS', 'kafka1:9092,kafka2:9093,kafka3:9094')
+        self.brokers = os.getenv('BOOTSTRAP_SERVERS', 'kafka101:29092,kafka102:29092,kafka103:29092')
         self.topic = None
         self.group = None
         self.list_msg = []
-        self.limit_msg = 50
-        self.timeout_msg = 5000
-        self.timeout_request = 2
+        self.timeout_request = 3
         self.package_data = None
         self.producer = None
+        self.cache = None
 
     def run(self):
-        asyncio.run(self.listen_message())
         self.init_producer()
+        self.init_redis()
+        asyncio.run(self.listen_message())
+
+    def init_redis(self):
+        self.cache = redis.Redis(
+            host=os.getenv('REDIS_HOST', 'redis'),
+            port=os.getenv('REDIS_PORT', 6379)
+        )
 
     def init_producer(self):
         producer_conf = {'bootstrap.servers': self.brokers}
@@ -46,15 +57,15 @@ class AsyncConsumerLow:
         client = KafkaConsumer(
             self.topic,
             bootstrap_servers=brokers,
-            auto_offset_reset='latest',
+            auto_offset_reset='earliest',
             enable_auto_commit=True,
             group_id=self.group,
-            max_poll_records=self.limit_msg
+            max_poll_records=constants.LIMIT_MSG
         )
 
         while True:
             try:
-                messages = client.poll(self.timeout_msg)
+                messages = client.poll(constants.TIMEOUT_MSG)
 
                 is_timeout = False
                 if not messages:
@@ -65,7 +76,7 @@ class AsyncConsumerLow:
                             self.process_msg(message)
                             self.list_msg.append(self.package_data)
 
-                if len(self.list_msg) >= self.limit_msg \
+                if len(self.list_msg) >= constants.LIMIT_MSG \
                         or is_timeout and len(self.list_msg) > 0:
                     async with aiohttp.ClientSession() as session:
                         start_time = time.time()
@@ -74,40 +85,71 @@ class AsyncConsumerLow:
 
                         self.list_msg = []
                         time_metrics = time.time() - start_time
-                        print("TIME PROCESS MSG WEBHOOK: ", time_metrics)
-            except Exception as e:
-                print('Timeout message ' + str(e))
+                        print(f"TOTAL TIME FOR PROCESSING MESSAGES TO WEBHOOK: ", time_metrics)
+            except (TimeoutError, Exception):
+                logging.error(f"Timeout because not getting any message after {constants.TIMEOUT_MSG}", exc_info=True)
 
     def process_msg(self, msg):
+        print(msg, "MSG >>")
         try:
             self.package_data = json.loads(msg.value.decode('utf-8'))
 
             print("Package with code:", self.package_data['pkg_code'],
                   "and status:", self.package_data['package_status_id'])
-        except Exception as e:
-            print("Cannot parse message -> Invalid format" + str(e))
+        except (ValueError, Exception):
+            logging.error("Cannot parse message because invalid format", exc_info=True)
 
     async def get_task(self, session, msg):
         base_url = os.getenv('WEBHOOK_URL')
+        print(msg, "MSG RETRY >>")
         url = base_url + msg['webhook_url']
+        shop_id = msg['shop_id']
         params = {
             'pkg_code': msg['pkg_code'],
             'package_status_id': msg['package_status_id'],
         }
 
         try:
+            start_request = time.time()
             async with session.post(url, json=params, ssl=False, timeout=self.timeout_request) as response:
-                response_webhook = await response.json()
+                response_status = response.status
+                if response_status in constants.STATUS_ALLOW:
+                    retry_webhook = RetryWebhook(topic=self.topic, brokers=self.brokers)
+                    retry_webhook.retry(params['pkg_code'], response_status, msg)
+                    print("Retry send package", params['pkg_code'])
+                end_result = time.time()
+                response_time = round(end_result - start_request, 2)
+                response_log = f"[INFO] Response {response}: Receive package {params['pkg_code']} within {str(response_time)} seconds"
+                self.produce_logstash(response_log, pkg_code=params['pkg_code'])
+                self.calculate_avg_response(shop_id, response_time)
 
-                print(response_webhook)
-        except Exception as e:
-            self.switch_topic(self.package_data)
-            print("Exception timeout " + str(e))
+        except (TimeoutError, Exception) as e:
+            self.switch_topic(msg)
+            print("Timeout for waiting for response, this request will be switched to alternative topic", e)
+
+    def calculate_avg_response(self, shop_id, response_time):
+        shop_cached = json.loads(self.cache.get(shop_id))
+        time_responses = shop_cached['time_responses'] if 'time_responses' in shop_cached.keys() else []
+        total_responses = shop_cached['total_responses'] if 'total_responses' in shop_cached.keys() else None
+
+        if shop_cached:
+            time_responses.append(response_time)
+            if len(time_responses) < constants.LIMIT_REDIS_MSG:
+                total_responses = reduce(lambda x, y: x + y, time_responses)
+            else:
+                first_response = time_responses.pop(0)
+                total_responses = total_responses - first_response + response_time
+
+            recalculated = total_responses / len(time_responses)
+            shop_cached['time_responses'] = time_responses
+            shop_cached['total_responses'] = total_responses
+            shop_cached['avg_response'] = recalculated
+            self.cache.set(shop_id, json.dumps(shop_cached))
 
     def switch_topic(self, message):
         rank_topic = constants.RANK_TOPIC
         for index, topic in enumerate(rank_topic):
-            if topic == self.topic and index != len(rank_topic - 1):
+            if topic == self.topic and index != len(rank_topic) - 1:
                 self.producer_topic(rank_topic[index + 1], message)
 
     def producer_topic(self, topic, package_data):
@@ -115,5 +157,15 @@ class AsyncConsumerLow:
             pkg_code = package_data['pkg_code']
             self.producer.produce(topic, json.dumps(package_data).encode('utf-8'), key=pkg_code)
             self.producer.poll(0)
+            self.producer.flush()
         except Exception as e:
-            print('[EXCEPTION] Has an error when producer to topic: ' + str(e))
+            logging.error('Has an error when producer to topic: ' + str(e))
+
+    def produce_logstash(self, msg, pkg_code):
+        try:
+            topic = os.getenv("LOG_STASH_TOPIC", "logstash_topic")
+            self.producer.produce(topic, json.dumps(msg).encode('utf-8'), key=pkg_code)
+            self.producer.poll(10)
+            self.producer.flush()
+        except Exception as e:
+            logging.error('Has an error when producer to topic log stash: ' + str(e))

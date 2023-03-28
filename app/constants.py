@@ -13,3 +13,9 @@ PKG_STATUS = {
 # }
 
 RANK_TOPIC = ['connector.logistic.packages', 'gold_topic', 'silver_topic']
+
+LIMIT_MSG = 50
+LIMIT_REDIS_MSG = 100
+TIMEOUT_MSG = 5000
+TIMEOUT_REQUEST = 3
+STATUS_ALLOW = [429, 404, 500, 502, 503, 504]

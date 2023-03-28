@@ -5,6 +5,7 @@ python-dotenv
 ujson
 kafka-python
 requests
+cryptography
 flask
 aiohttp
 redis

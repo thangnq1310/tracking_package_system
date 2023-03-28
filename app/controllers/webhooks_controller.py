@@ -12,8 +12,8 @@ def ping():
 
 @webhooks_routes.route('/alpha', methods=['POST'])
 def alpha_webhook():
-    req_data = request.json if request.json else {}
-    print("Params Alpha:", req_data)
+    # req_data = request.json if request.json else {}
+    # print("Params Alpha:", req_data)
     time.sleep(2)
 
     return {
@@ -26,7 +26,7 @@ def alpha_webhook():
 def beta_webhook():
     # req_data = request.json if request.json else {}
     # print("Params Beta:", req_data)
-    time.sleep(15)
+    time.sleep(5)
 
     return {
         'success': True,
@@ -36,8 +36,8 @@ def beta_webhook():
 
 @webhooks_routes.route('/gamma', methods=['POST'])
 def gamma_webhook():
-    req_data = request.json if request.json else {}
-    print("Params Gamma:", req_data)
+    # req_data = request.json if request.json else {}
+    # print("Params Gamma:", req_data)
     time.sleep(10)
 
     return {
