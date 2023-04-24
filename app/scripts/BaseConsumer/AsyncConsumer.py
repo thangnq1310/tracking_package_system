@@ -91,7 +91,7 @@ class AsyncConsumer:
 
                         self.list_msg = []
                         time_metrics = time.time() - start_time
-                        print(f"TOTAL TIME FOR PROCESSING MESSAGES TO WEBHOOK: ", time_metrics)
+                        print(f"[METRIC] Metric time for processing messages to webhook: ", round(time_metrics, 2))
             except (TimeoutError, Exception):
                 logging.error(f"Timeout because not getting any message after {constants.TIMEOUT_MSG}", exc_info=True)
 
@@ -144,7 +144,7 @@ class AsyncConsumer:
 
             self.package_data = {
                 'id': package_data['id'],
-                'pkg_code': package_data['pkg_order'],
+                'pkg_code': package_data['code'],
                 'package_status_id': package_data['status'],
                 'shop_id': package_data['shop_id'],
                 'customer_id': package_data['customer_id'],
