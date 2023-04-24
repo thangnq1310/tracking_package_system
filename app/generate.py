@@ -11,6 +11,6 @@ for i in range(1, 1000000):
     order = str(i).zfill(6)
     print(order)
     packages = Packages(id=i, shop_id=shop_id, current_station_id=current_station_id,
-                        customer_id=customer_id, status=0, pkg_order='P' + order)
+                        customer_id=customer_id, status=0, code='P' + order)
     session.add(packages)
     session.commit()

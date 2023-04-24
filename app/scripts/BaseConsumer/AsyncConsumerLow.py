@@ -85,7 +85,7 @@ class AsyncConsumerLow:
 
                         self.list_msg = []
                         time_metrics = time.time() - start_time
-                        print(f"TOTAL TIME FOR PROCESSING MESSAGES TO WEBHOOK: ", time_metrics)
+                        print(f"[METRIC] Metric time for processing messages to webhook: ", round(time_metrics, 2))
             except (TimeoutError, Exception):
                 logging.error(f"Timeout because not getting any message after {constants.TIMEOUT_MSG}", exc_info=True)
 
