@@ -59,7 +59,7 @@ class AsyncConsumer:
         client = KafkaConsumer(
             self.topic,
             bootstrap_servers=brokers,
-            auto_offset_reset='earliest',
+            auto_offset_reset='latest',
             enable_auto_commit=True,
             group_id=self.group,
             max_poll_records=constants.LIMIT_MSG
@@ -101,15 +101,18 @@ class AsyncConsumer:
             if 'payload' in self.raw_package_data:
                 self.raw_package_data = self.raw_package_data['payload']
 
-            self.ts_ms = str(self.raw_package_data['source']['ts_ms']) if 'source' \
-                                in self.raw_package_data.keys() else self.raw_package_data['ts_ms']
+            self.ts_ms = str(self.raw_package_data['source']['ts_ms']) \
+                if 'source' in self.raw_package_data.keys() else self.raw_package_data['ts_ms']
 
             rs = self.format_message()
             if rs is False:
                 print('No need to process message because status does not change')
 
-            print("Package with code:", self.package_data['pkg_code'], "and status:",
-                  self.package_data['package_status_id'])
+            msg = f"[PROCESSING] Processing package of shop code: {self.package_data['shop_id']} with pkg_code: " \
+                  f"{self.package_data['pkg_code']} and status: {self.package_data['package_status_id']}"
+
+            self.produce_logstash(msg, self.package_data['pkg_code'])
+
         except (ValueError, Exception):
             logging.error("Cannot parse message because invalid format", exc_info=True)
 
@@ -170,15 +173,20 @@ class AsyncConsumer:
             cache_time = shop_cached['avg_response']
 
             if cache_time:
-                if 2 > cache_time:
-                    print(f'This message has been cached and will stay in {self.topic} topic')
+                if constants.PLATINUM_TIMEOUT_REQUEST > cache_time:
+                    msg = f"[CACHED] This package {package_data['pkg_code']} of shop code {package_data['shop_id']} " \
+                          f"has been cached and will remain in {self.topic} topic"
+                    self.produce_logstash(msg, package_data['pkg_code'])
                     return True
-                elif 2 < cache_time < 4:
-                    print('This message has been cached, switch message to', constants.RANK_TOPIC[1])
+                elif constants.PLATINUM_TIMEOUT_REQUEST < cache_time < constants.GOLD_TIMEOUT_REQUEST:
+                    msg = f"[CACHED] This package {package_data['pkg_code']} of shop code {package_data['shop_id']} " \
+                          f"has been cached, switch message to {constants.RANK_TOPIC[1]}"
                     self.producer_topic(constants.RANK_TOPIC[1], package_data)
                 else:
-                    print('This message has been cached, switch message to', constants.RANK_TOPIC[2])
+                    msg = f"[CACHED] This package {package_data['pkg_code']} of shop code {package_data['shop_id']} " \
+                          f"has been cached, switch message to {constants.RANK_TOPIC[2]}"
                     self.producer_topic(constants.RANK_TOPIC[2], package_data)
+                self.produce_logstash(msg, package_data['pkg_code'])
                 return False
 
             return True
@@ -216,20 +224,28 @@ class AsyncConsumer:
 
         try:
             start_request = time.time()
-            async with session.post(url, json=params, ssl=False, timeout=constants.TIMEOUT_REQUEST) as response:
+            async with session.post(url, json=params, ssl=False, timeout=constants.PLATINUM_TIMEOUT_REQUEST) \
+                    as response:
                 response_status = response.status
                 if response_status in constants.STATUS_ALLOW:
                     retry_webhook = RetryWebhook(topic=self.topic, brokers=self.brokers)
+                    message = f'[RETRY]: Retry sending package {msg["pkg_code"]} because of getting error server ' \
+                              f'response'
+                    self.produce_logstash(message, msg['pkg_code'])
                     retry_webhook.retry(msg['pkg_code'], response_status, msg)
                 end_result = time.time()
                 response_time = round(end_result - start_request, 2)
-                response_log = f"[INFO] Response {response}: Receive package {params['pkg_code']} within {str(response_time)} seconds"
+                response_log = f"[RESPONSE] Response {response}: Receive package {params['pkg_code']} " \
+                               f"within {str(response_time)} seconds"
                 self.produce_logstash(response_log, pkg_code=params['pkg_code'])
                 self.calculate_avg_response(shop_id, response_time)
 
         except (TimeoutError, Exception) as e:
             self.switch_topic(msg)
-            print("Timeout for waiting for response, this request will be switched to alternative topic", e)
+            print(e)
+            message = f"[TIMEOUT] Timeout for waiting for response, this request of package {msg['pkg_code']} of " \
+                      f"shop {msg['shop_id']} will be switched to alternative topic"
+            self.produce_logstash(message, msg['pkg_code'])
 
     def switch_topic(self, message):
         rank_topic = constants.RANK_TOPIC

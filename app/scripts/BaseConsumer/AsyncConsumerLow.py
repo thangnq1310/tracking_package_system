@@ -57,7 +57,7 @@ class AsyncConsumerLow:
         client = KafkaConsumer(
             self.topic,
             bootstrap_servers=brokers,
-            auto_offset_reset='earliest',
+            auto_offset_reset='latest',
             enable_auto_commit=True,
             group_id=self.group,
             max_poll_records=constants.LIMIT_MSG
@@ -90,18 +90,18 @@ class AsyncConsumerLow:
                 logging.error(f"Timeout because not getting any message after {constants.TIMEOUT_MSG}", exc_info=True)
 
     def process_msg(self, msg):
-        print(msg, "MSG >>")
         try:
             self.package_data = json.loads(msg.value.decode('utf-8'))
 
-            print("Package with code:", self.package_data['pkg_code'],
-                  "and status:", self.package_data['package_status_id'])
+            msg = f"[PROCESSING] Processing package of shop code: {self.package_data['shop_id']} with pkg_code: " \
+                  f"{self.package_data['pkg_code']} and status: {self.package_data['package_status_id']}"
+
+            self.produce_logstash(msg, self.package_data['pkg_code'])
         except (ValueError, Exception):
             logging.error("Cannot parse message because invalid format", exc_info=True)
 
     async def get_task(self, session, msg):
         base_url = os.getenv('WEBHOOK_URL')
-        print(msg, "MSG RETRY >>")
         url = base_url + msg['webhook_url']
         shop_id = msg['shop_id']
         params = {
@@ -115,17 +115,23 @@ class AsyncConsumerLow:
                 response_status = response.status
                 if response_status in constants.STATUS_ALLOW:
                     retry_webhook = RetryWebhook(topic=self.topic, brokers=self.brokers)
+                    message = f'[RETRY]: Retry sending package {msg["pkg_code"]} because of getting error server ' \
+                              f'response'
+                    self.produce_logstash(message, msg['pkg_code'])
                     retry_webhook.retry(params['pkg_code'], response_status, msg)
-                    print("Retry send package", params['pkg_code'])
                 end_result = time.time()
                 response_time = round(end_result - start_request, 2)
-                response_log = f"[INFO] Response {response}: Receive package {params['pkg_code']} within {str(response_time)} seconds"
+                response_log = f"[RESPONSE] Response {response}: Receive package {params['pkg_code']} " \
+                               f"within {str(response_time)} seconds"
                 self.produce_logstash(response_log, pkg_code=params['pkg_code'])
                 self.calculate_avg_response(shop_id, response_time)
 
         except (TimeoutError, Exception) as e:
             self.switch_topic(msg)
-            print("Timeout for waiting for response, this request will be switched to alternative topic", e)
+            print(e)
+            message = f"[TIMEOUT] Timeout for waiting for response, this request of package {msg['pkg_code']} of " \
+                      f"shop {msg['shop_id']} will be switched to alternative topic"
+            self.produce_logstash(message, msg['pkg_code'])
 
     def calculate_avg_response(self, shop_id, response_time):
         shop_cached = json.loads(self.cache.get(shop_id))
