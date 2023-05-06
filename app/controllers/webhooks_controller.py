@@ -71,3 +71,9 @@ def update_packages():
 
     package_service = PackageService()
     return package_service.update_packages(shop_id, pkg_status_id)
+
+
+@webhooks_routes.route('/update-random-packages', methods=['POST'])
+def update_random_packages():
+    package_service = PackageService()
+    return package_service.update_random_packages()
