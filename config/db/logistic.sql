@@ -6,12 +6,12 @@ CREATE TABLE `packages` (
   `customer_id` int,
   `cod_id` int,
   `status` int,
-  `picked_at` datetime,
-  `delivered_at` datetime,
-  `done_at` datetime,
-  `audited_at` datetime,
-  `created` datetime,
-  `modified` datetime
+  `picked_at` timestamp,
+  `delivered_at` timestamp,
+  `done_at` timestamp,
+  `audited_at` timestamp,
+  `created` timestamp default now(),
+  `modified` timestamp
 );
 
 CREATE TABLE `shops` (
