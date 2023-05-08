@@ -1,6 +1,5 @@
 const express = require("express");
 const app = express();
-const cookieParser = require("cookie-parser");
 require("dotenv").config();
 
 const db = require("./db");
@@ -10,7 +9,6 @@ db.sync();
 // Use middleware
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-app.use(cookieParser());
 
 const partner = require("./routes/partner.route.js");
 const package = require("./routes/package.route.js");
