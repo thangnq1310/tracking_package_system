@@ -1,7 +1,7 @@
 const router = require("express").Router();
 const partnerController = require("../controllers/partner.controller");
 
-router.get("/alpha", partnerController.webhookAlpha);
+router.post("/alpha", partnerController.webhookAlpha);
 
 router.post("/beta", partnerController.webhookBeta);
 

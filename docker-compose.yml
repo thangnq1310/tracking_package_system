@@ -260,7 +260,7 @@ services:
   server:
     build: ./server
     ports:
-      - "8088:8080"
+      - "8088:8088"
     volumes:
       - ./server:/server
       - /server/node_modules
