@@ -98,7 +98,7 @@ const packageController = {
         message: `Trạng thái đơn hàng ${pkg_status_id} cần cập nhật không hợp lệ!`,
       });
     }
-    
+
     let updated;
     if (shop_id) {
       updated = await Package.update(
@@ -108,15 +108,23 @@ const packageController = {
     } else {
       updated = await Package.update(
         { status: pkg_status_id },
-        { where: true }
+        {
+          where: {
+            code: {
+              [Op.not]: null,
+            },
+          },
+        }
       );
     }
 
     if (updated) {
-      const has_shop = `của cửa hàng ${shop_id}`
+      const has_shop = `của cửa hàng ${shop_id}`;
       return res.status(200).json({
         success: true,
-        message: `Cập nhật trạng thái đơn hàng thành ${pkg_status_id} ${shop_id ? has_shop : ''} thành công.`,
+        message: `Cập nhật trạng thái đơn hàng thành ${pkg_status_id} ${
+          shop_id ? has_shop : ""
+        } thành công.`,
         data: updated,
       });
     } else {
