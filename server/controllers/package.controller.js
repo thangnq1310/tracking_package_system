@@ -121,10 +121,10 @@ const packageController = {
     }
 
     if (updated) {
-      const has_shop = `của cửa hàng ${shop_id}`;
+      const has_shop = ` của cửa hàng ${shop_id}`;
       return res.status(200).json({
         success: true,
-        message: `Cập nhật trạng thái đơn hàng thành ${pkg_status_id} ${
+        message: `Cập nhật trạng thái đơn hàng thành ${pkg_status_id}${
           shop_id ? has_shop : ""
         } thành công.`,
         data: updated,
