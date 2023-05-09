@@ -85,10 +85,10 @@ const packageController = {
   updatePackages: async (req, res) => {
     const { shop_id, pkg_status_id } = req.body;
 
-    if (!shop_id || !pkg_status_id) {
+    if (!pkg_status_id) {
       return res.status(400).json({
         success: false,
-        message: "Không có dữ liệu về cửa hàng.",
+        message: "Không có dữ liệu về trạng thái cần cập nhật.",
       });
     }
 
@@ -98,16 +98,25 @@ const packageController = {
         message: `Trạng thái đơn hàng ${pkg_status_id} cần cập nhật không hợp lệ!`,
       });
     }
-
-    const updated = await Package.update(
-      { status: pkg_status_id },
-      { where: { shop_id: shop_id } }
-    );
+    
+    let updated;
+    if (shop_id) {
+      updated = await Package.update(
+        { status: pkg_status_id },
+        { where: { shop_id: shop_id } }
+      );
+    } else {
+      updated = await Package.update(
+        { status: pkg_status_id },
+        { where: true }
+      );
+    }
 
     if (updated) {
+      const has_shop = `của cửa hàng ${shop_id}`
       return res.status(200).json({
         success: true,
-        message: `Cập nhật trạng thái đơn hàng thành ${pkg_status_id} của cửa hàng ${shop_id} thành công.`,
+        message: `Cập nhật trạng thái đơn hàng thành ${pkg_status_id} ${shop_id ? has_shop : ''} thành công.`,
         data: updated,
       });
     } else {
