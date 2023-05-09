@@ -1,4 +1,6 @@
 const initModels = require("../models/init-models");
+const Sequelize = require('sequelize')
+const op = Sequelize.Op;
 
 const { Package } = initModels();
 
@@ -111,7 +113,7 @@ const packageController = {
         {
           where: {
             code: {
-              [Op.not]: null,
+              [op.not]: null,
             },
           },
         }
