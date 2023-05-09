@@ -77,6 +77,15 @@ services:
     restart: unless-stopped
     container_name: prometheus
 
+  kafka-lag-exporter:
+    image: lightbend/kafka-lag-exporter:0.5.5
+    container_name: kafka-lag-exporter
+    restart: unless-stopped
+    ports:
+      - 9999:9999
+    volumes:
+      - ./config/kafka-lag-exporter/:/opt/docker/conf/
+
   jmx-kafka101:
     image: sscaling/jmx-prometheus-exporter
     ports:
@@ -208,7 +217,7 @@ services:
     environment:
      - MYSQL_ROOT_PASSWORD=${PW}
      - LANG=C.UTF-8
-    container_name: mysql_kafka
+    container_name: database
     volumes:
       - ./data/db:/var/lib/mysql
       - ./config/db/logistic.sql:/docker-entrypoint-initdb.d/logistic.sql
