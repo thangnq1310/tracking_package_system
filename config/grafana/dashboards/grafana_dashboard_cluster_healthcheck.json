@@ -492,7 +492,7 @@
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "JVM Memory Used (Heap)",
+      "title": "Memory Used",
       "tooltip": {
         "shared": true,
         "sort": 0,
