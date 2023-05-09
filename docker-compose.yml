@@ -217,7 +217,7 @@ services:
     environment:
      - MYSQL_ROOT_PASSWORD=${PW}
      - LANG=C.UTF-8
-    container_name: database
+    container_name: mysql_kafka
     volumes:
       - ./data/db:/var/lib/mysql
       - ./config/db/logistic.sql:/docker-entrypoint-initdb.d/logistic.sql
