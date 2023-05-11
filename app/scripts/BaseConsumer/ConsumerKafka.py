@@ -110,23 +110,22 @@ class ConsumerKafka:
             if shop_response_time is None:
                 shop = session.query(Shops.webhook_url, Shops.name)\
                                     .filter(Shops.id == package_data['shop_id']).first()
-                shop = dict(shop)
-                shop_name = shop['name']
+                webhook_url, shop_name = shop
                 if shop_name == 'Alpha':
-                    shop['cache_time'] = 2
+                    shop['cache_time'] = 0.2
                 elif shop_name == 'Beta':
-                    shop['cache_time'] = 10
+                    shop['cache_time'] = 0.4
                 else:
-                    shop['cache_time'] = 5
+                    shop['cache_time'] = 0.6
 
                 self.cache.set(package_data['shop_id'], json.dumps(shop))
 
             cache_time = shop_response_time['cache_time']
-            package_data['webhook_url'] = shop_response_time['webhook_url']
+            package_data['webhook_url'] = webhook_url
 
-            if 5 > cache_time >= 2:
+            if constants.PLATINUM_TIMEOUT_REQUEST > cache_time:
                 self.producer_topic(constants.RANK_TOPIC['platinum'], package_data)
-            elif 5 <= cache_time < 10:
+            elif constants.PLATINUM_TIMEOUT_REQUEST < cache_time < constants.GOLD_TIMEOUT_REQUEST:
                 self.producer_topic(constants.RANK_TOPIC['gold'], package_data)
             else:
                 self.producer_topic(constants.RANK_TOPIC['silver'], package_data)
