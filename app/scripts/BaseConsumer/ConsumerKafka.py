@@ -90,7 +90,7 @@ class ConsumerKafka:
 
         self.package_data = {
             'id': package_data['id'],
-            'pkg_code': package_data['pkg_order'],
+            'pkg_code': package_data['code'],
             'package_status_id': package_data['status'],
             'shop_id': package_data['shop_id'],
             'customer_id': package_data['customer_id'],
@@ -104,31 +104,33 @@ class ConsumerKafka:
     def process_message(self, package_data):
         try:
             # cache shop
-            shop_response_time = self.cache.get(package_data['shop_id'])
+            cache_key = 'S' + str(package_data['shop_id'])
+            shop_response_time = self.cache.get(cache_key)
             shop_response_time = json.loads(shop_response_time) if shop_response_time else None
 
             if shop_response_time is None:
-                shop = session.query(Shops.webhook_url, Shops.name)\
-                                    .filter(Shops.id == package_data['shop_id']).first()
-                webhook_url, shop_name = shop
-                if shop_name == 'Alpha':
-                    shop['cache_time'] = 0.2
-                elif shop_name == 'Beta':
-                    shop['cache_time'] = 0.4
-                else:
-                    shop['cache_time'] = 0.6
+                self.producer_topic(constants.RANK_TOPIC[0], package_data)
+                return
 
-                self.cache.set(package_data['shop_id'], json.dumps(shop))
-
+            webhook_url = shop_response_time['webhook_url']
             cache_time = shop_response_time['cache_time']
             package_data['webhook_url'] = webhook_url
 
             if constants.PLATINUM_TIMEOUT_REQUEST > cache_time:
-                self.producer_topic(constants.RANK_TOPIC['platinum'], package_data)
+                msg = f"[CACHED] This package {package_data['pkg_code']} of shop code {package_data['shop_id']} " \
+                          f"has been cached, switch message to {constants.RANK_TOPIC[0]}"
+                self.produce_logstash(msg, package_data['pkg_code'])
+                self.producer_topic(constants.RANK_TOPIC[0], package_data)
             elif constants.PLATINUM_TIMEOUT_REQUEST < cache_time < constants.GOLD_TIMEOUT_REQUEST:
-                self.producer_topic(constants.RANK_TOPIC['gold'], package_data)
+                msg = f"[CACHED] This package {package_data['pkg_code']} of shop code {package_data['shop_id']} " \
+                          f"has been cached, switch message to {constants.RANK_TOPIC[1]}"
+                self.produce_logstash(msg, package_data['pkg_code'])
+                self.producer_topic(constants.RANK_TOPIC[1], package_data)
             else:
-                self.producer_topic(constants.RANK_TOPIC['silver'], package_data)
+                msg = f"[CACHED] This package {package_data['pkg_code']} of shop code {package_data['shop_id']} " \
+                          f"has been cached, switch message to {constants.RANK_TOPIC[2]}"
+                self.produce_logstash(msg, package_data['pkg_code'])
+                self.producer_topic(constants.RANK_TOPIC[2], package_data)
 
         except Exception as e:
             print('[EXCEPTION] Has an error when post to webhook: ' + str(e))
@@ -140,4 +142,13 @@ class ConsumerKafka:
             self.producer.poll(0)
         except Exception as e:
             print('[EXCEPTION] Has an error when producer to topic: ' + str(e))
+
+    def produce_logstash(self, msg, pkg_code):
+        try:
+            topic = os.getenv("LOG_STASH_TOPIC", "logstash_topic")
+            self.producer.produce(topic, json.dumps(msg).encode('utf-8'), key=pkg_code)
+            self.producer.poll(10)
+            self.producer.flush()
+        except Exception as e:
+            print('Has an error when producer to topic log stash: ' + str(e))
 
