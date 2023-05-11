@@ -2,6 +2,7 @@ import os
 
 import requests
 import logging
+from confluent_kafka import Producer
 from kafka import KafkaConsumer
 from dotenv import load_dotenv
 from retry_webhook import RetryWebhook
@@ -13,6 +14,7 @@ import ujson as json
 load_dotenv()
 
 
+# command: python worker.py Consumer ConsumerKafka
 class ConsumerKafka:
     def __init__(self):
         self.topic = os.getenv('PACKAGE_TOPIC', 'connector.logistic.packages')
@@ -21,6 +23,7 @@ class ConsumerKafka:
         self.raw_msg = None
         self.msg = None
         self.ts_ms = None
+        self.producer = Producer(**{'bootstrap.servers': self.brokers})
 
     def connect_kafka(self):
         print('CONSUMER TOPIC: ' + self.topic)
@@ -58,7 +61,7 @@ class ConsumerKafka:
             }
         self.msg = {
             'id': package_data['id'],
-            'pkg_code': package_data['pkg_code'],
+            'pkg_code': package_data['code'],
             'package_status_id': package_data['status'],
             'shop_id': package_data['shop_id'],
             'customer_id': package_data['customer_id'],
@@ -73,22 +76,22 @@ class ConsumerKafka:
         try:
             params = {
                 'pkg_code': msg['pkg_code'],
-                'status': msg['package_status_id']
+                'package_status_id': int(msg['package_status_id'])
             }
 
-            shop = db.query(Shops.webhook_url).filter(Shops.id == msg['shop_id']).first()
-            shop = dict(shop)
-            webhook_url = shop['webhook_url']
+            shop = db.query(Shops.webhook_url, Shops.id).filter(Shops.id == msg['shop_id']).first()
+            webhook_url, shop_id = shop
             url = os.getenv('WEBHOOK_URL') + webhook_url
 
-            msg = f"[PROCESSING] Processing package of shop code: {shop['shop_id']} with pkg_code: " \
+            message = f"[PROCESSING] Processing package of shop code: {shop_id} with pkg_code: " \
                   f"{msg['pkg_code']} and status: {msg['package_status_id']}"
 
-            self.produce_logstash(msg, msg['pkg_code'])
+            self.produce_logstash(message, msg['pkg_code'])
 
-            response = requests.post(url, data=params)
+            response = requests.post(url, json=params)
             response_time = response.elapsed.total_seconds()
-            response_log = f"[RESPONSE] Response {response.text}: Receive package {msg['pkg_code']} " \
+            response_text = str(response.text)
+            response_log = f"[RESPONSE] Response {response_text}: Receive package {msg['pkg_code']} " \
                                f"within {str(response_time)} seconds"
             self.produce_logstash(response_log, pkg_code=msg['pkg_code'])
 
