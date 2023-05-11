@@ -130,9 +130,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# IDE
-.idea
-
 *.pyc
 
 */*/*/__pycache__/
@@ -140,6 +137,9 @@ dmypy.json
 */*/__pycache__/
 
 */__pycache__/
+
+# IDE
+.idea
 
 supervisord.pid
 supervisord.log
@@ -150,5 +150,8 @@ app/cache
 db/data
 app/controllers/__pycache__
 app/scripts/__pycache__
+app/scripts/BaseConsumer/__pycache__
 server/node_modules
 server/package-lock.json
+
+data/
