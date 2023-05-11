@@ -77,6 +77,15 @@ services:
     restart: unless-stopped
     container_name: prometheus
 
+  kafka-lag-exporter:
+    image: lightbend/kafka-lag-exporter:0.5.5
+    container_name: kafka-lag-exporter
+    restart: unless-stopped
+    ports:
+      - 9999:9999
+    volumes:
+      - ./config/kafka-lag-exporter/:/opt/docker/conf/
+
   jmx-kafka101:
     image: sscaling/jmx-prometheus-exporter
     ports:
@@ -260,7 +269,7 @@ services:
   server:
     build: ./server
     ports:
-      - "8088:8080"
+      - "8088:8088"
     volumes:
       - ./server:/server
       - /server/node_modules

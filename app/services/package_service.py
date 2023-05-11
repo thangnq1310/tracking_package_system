@@ -1,4 +1,4 @@
-import json
+import random
 
 from models.base import session
 from models.model import *
@@ -64,10 +64,31 @@ class PackageService:
             })
         else:
             return jsonify({
-                'success': True,
+                'success': False,
                 'message': f'Cập nhật trạng thái đơn hàng của cửa hàng {shop_id} thất bại.',
                 'data': updated
             })
+
+    def update_random_packages(self):
+        pkg_codes = list(session.query(Packages.code, Packages.status).all())
+
+        cnt = 0
+        for i in range(0, 5):
+            for j in range(0, 200):
+                cnt += 1
+                random_order = random.choice(pkg_codes)
+                pkg_code = random_order[0]
+                pkg_status = random_order[1]
+                if pkg_status < i:
+                    session.query(Packages).filter(Packages.code == pkg_code).update({'status': i})
+                    session.commit()
+                    session.flush()
+
+        return jsonify({
+            'success': True,
+            'message': f'Đã cập nhật trạng thái đơn hàng của {cnt} đơn hàng bất kì.',
+            'data': True
+        })
 
     def format_package(self, pkg):
         if not isinstance(pkg, Packages):

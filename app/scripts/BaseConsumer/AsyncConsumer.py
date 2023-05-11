@@ -242,7 +242,6 @@ class AsyncConsumer:
 
         except (TimeoutError, Exception) as e:
             self.switch_topic(msg)
-            print(e)
             message = f"[TIMEOUT] Timeout for waiting for response, this request of package {msg['pkg_code']} of " \
                       f"shop {msg['shop_id']} will be switched to alternative topic"
             self.produce_logstash(message, msg['pkg_code'])
