@@ -4,6 +4,7 @@ import requests
 import logging
 from kafka import KafkaConsumer
 from dotenv import load_dotenv
+from retry_webhook import RetryWebhook
 
 from models.base import session as db
 from models.model import *
@@ -90,6 +91,15 @@ class ConsumerKafka:
             response_log = f"[RESPONSE] Response {response.text}: Receive package {msg['pkg_code']} " \
                                f"within {str(response_time)} seconds"
             self.produce_logstash(response_log, pkg_code=msg['pkg_code'])
+
+        except requests.exceptions.Timeout as e:
+            logging.error('[EXCEPTION] Timeout when sending webhook' + str(e))
+            
+            retry_webhook = RetryWebhook(topic=self.topic, brokers=self.brokers)
+            message = f'[RETRY]: Retry sending package {msg["pkg_code"]} because of getting error server ' \
+                        f'response'
+            self.produce_logstash(message, msg['pkg_code'])
+            retry_webhook.retry(msg['pkg_code'], response.status_code, msg)
 
         except Exception as e:
             logging.error('[EXCEPTION] Has an error when post to webhook: ' + str(e))
