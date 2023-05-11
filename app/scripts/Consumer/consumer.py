@@ -1,6 +1,7 @@
 import os
 
 import requests
+import logging
 from kafka import KafkaConsumer
 from dotenv import load_dotenv
 
@@ -56,7 +57,7 @@ class ConsumerKafka:
             }
         self.msg = {
             'id': package_data['id'],
-            'pkg_code': package_data['pkg_order'],
+            'pkg_code': package_data['pkg_code'],
             'package_status_id': package_data['status'],
             'shop_id': package_data['shop_id'],
             'customer_id': package_data['customer_id'],
@@ -73,18 +74,34 @@ class ConsumerKafka:
                 'pkg_code': msg['pkg_code'],
                 'status': msg['package_status_id']
             }
-            print('Package with pkg_code', msg['pkg_code'], 'and status', msg['package_status_id'])
 
             shop = db.query(Shops.webhook_url).filter(Shops.id == msg['shop_id']).first()
             shop = dict(shop)
             webhook_url = shop['webhook_url']
             url = os.getenv('WEBHOOK_URL') + webhook_url
 
+            msg = f"[PROCESSING] Processing package of shop code: {shop['shop_id']} with pkg_code: " \
+                  f"{msg['pkg_code']} and status: {msg['package_status_id']}"
+
+            self.produce_logstash(msg, msg['pkg_code'])
+
             response = requests.post(url, data=params)
-            print("RESPONSE:", response.text, "in", str(response.elapsed.total_seconds()), 'seconds')
+            response_time = response.elapsed.total_seconds()
+            response_log = f"[RESPONSE] Response {response.text}: Receive package {msg['pkg_code']} " \
+                               f"within {str(response_time)} seconds"
+            self.produce_logstash(response_log, pkg_code=msg['pkg_code'])
 
         except Exception as e:
-            print('[EXCEPTION] Has an error when post to webhook: ' + str(e))
+            logging.error('[EXCEPTION] Has an error when post to webhook: ' + str(e))
+
+    def produce_logstash(self, msg, pkg_code):
+        try:
+            topic = os.getenv("LOG_STASH_TOPIC", "logstash_topic")
+            self.producer.produce(topic, json.dumps(msg).encode('utf-8'), key=pkg_code)
+            self.producer.poll(10)
+            self.producer.flush()
+        except Exception as e:
+            logging.error('Has an error when producer to topic log stash: ' + str(e))
 
 
 consumer_kafka = ConsumerKafka()
