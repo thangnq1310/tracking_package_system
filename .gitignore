@@ -132,8 +132,6 @@ dmypy.json
 
 *.pyc
 
-*/*/*/*/__pycache__/
-
 */*/*/__pycache__/
 
 */*/__pycache__/
@@ -146,7 +144,14 @@ dmypy.json
 supervisord.pid
 supervisord.log
 app/venv
+app/models/__pycache__
 app/.idea
 app/cache
 db/data
+app/controllers/__pycache__
+app/scripts/__pycache__
+app/scripts/BaseConsumer/__pycache__
+server/node_modules
 server/package-lock.json
+
+data/
