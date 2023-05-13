@@ -1,14 +1,18 @@
 import os
 
-import requests
 import logging
+import asyncio
+import aiohttp
 import redis
 from kafka import KafkaConsumer
 from confluent_kafka import Producer
 from dotenv import load_dotenv
+import constants
+import time
 
 import ujson as json
 
+from retry_webhook import RetryWebhook
 from models.base import session
 from models.model import Shops
 
@@ -23,11 +27,9 @@ class AsyncConsumer:
         self.raw_msg = None
         self.msg = None
         self.ts_ms = None
-        self.cache = redis.Redis(
-            host='redis',
-            port=6379
-        )
-        self.producer = Producer(**{'bootstrap.servers': self.brokers})
+        self.cache = None
+        self.producer = None
+        self.list_msg = []
 
     def connect_kafka(self):
         print('CONSUMER TOPIC: ' + self.topic)
@@ -45,12 +47,29 @@ class AsyncConsumer:
         )
 
     def run(self):
+        self.cache = redis.Redis(
+            host='redis',
+            port=6379
+        )
+        self.producer = Producer(**{'bootstrap.servers': self.brokers})
+        asyncio.run(self.listen_message())
+
+    async def listen_message(self):
         consumer = self.connect_kafka()
         for msg in consumer:
             self.raw_msg = json.loads(msg.value)
 
             self.format_message(self.raw_msg)
-            self.process_message(self.msg)
+            self.list_msg.append(self.msg)
+            if len(self.list_msg) >= constants.LIMIT_MSG and len(self.list_msg) > 0:
+                async with aiohttp.ClientSession() as session:
+                    start_time = time.time()
+                    tasks = [self.get_task(session, task) for task in self.list_msg]
+                    await asyncio.gather(*tasks)
+
+                    self.list_msg = []
+                    time_metrics = time.time() - start_time
+                    print(f"[METRIC] Metric time for processing messages to webhook: ", round(time_metrics, 2))
 
     def format_message(self, package_data):
         self.msg = {
@@ -63,7 +82,7 @@ class AsyncConsumer:
         }
         return True
 
-    def process_message(self, msg):
+    async def get_task(self, session, msg):
         try:
             params = {
                 'pkg_code': msg['pkg_code'],
@@ -90,18 +109,28 @@ class AsyncConsumer:
 
             self.produce_logstash(message, msg['pkg_code'])
 
-            response = requests.post(url, json=params)
-            response_time = response.elapsed.total_seconds()
-            if not cache_time:
-                cache_time = response_time
-                self.cache.set(cache_key, json.dumps({
-                    'webhook_url': webhook_url,
-                    'cache_time': cache_time
-                }))
+            start_request = time.time()
+            async with session.post(url, json=params, ssl=False, timeout=constants.PLATINUM_TIMEOUT_REQUEST) \
+                    as response:
+                response_status = response.status
+                if response_status in constants.STATUS_ALLOW:
+                    retry_webhook = RetryWebhook(topic=self.topic, brokers=self.brokers)
+                    message = f'[RETRY]: Retry sending package {msg["pkg_code"]} because of getting error server ' \
+                            f'response'
+                    self.produce_logstash(message, msg['pkg_code'])
+                    retry_webhook.retry(msg['pkg_code'], response_status, msg)
+                end_result = time.time()
+                response_time = round(end_result - start_request, 2)
+                response_log = f"[RESPONSE] Response {response}: Receive package {params['pkg_code']} " \
+                            f"within {str(response_time)} seconds"
+                self.produce_logstash(response_log, pkg_code=msg['pkg_code'])
 
-            response_log = f"[RESPONSE] Response {response.text}: Receive package {msg['pkg_code']} " \
-                               f"within {str(response_time)} seconds"
-            self.produce_logstash(response_log, pkg_code=msg['pkg_code'])
+                if not cache_time:
+                    cache_time = response_time
+                    self.cache.set(cache_key, json.dumps({
+                        'webhook_url': webhook_url,
+                        'cache_time': cache_time
+                    }))
 
         except Exception as e:
             logging.error('[EXCEPTION] Has an error when post to webhook: ' + str(e))
